@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>이벤트 쿠지 - EVENT KUJI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    background: #1a1030;
+    display: flex; justify-content: center;
+    overflow: hidden;
+    user-select: none;
+  }
+  #kiosk {
+    width: 100%; max-width: 480px; height: 100vh;
+    background: linear-gradient(160deg, #3b2a6e 0%, #5d3fa8 40%, #7b5bd6 100%);
+    position: relative; overflow: hidden;
+    box-shadow: 0 0 60px rgba(0,0,0,.6);
+  }
+  .screen {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    animation: fadeIn .35s ease;
+  }
+  .screen.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: none;} }
+
+  /* ───── 공통 ───── */
+  .logo-diamond {
+    width: 150px; height: 150px; margin: 0 auto;
+    background: #1c1c1c; transform: rotate(45deg);
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  .logo-diamond span {
+    transform: rotate(-45deg); color: #fff; font-weight: 900;
+    font-size: 26px; text-align: center; line-height: 1.25;
+  }
+  .logo-diamond small { display: block; font-size: 11px; letter-spacing: 3px; color: #f44; }
+  .btn {
+    border: none; cursor: pointer; font-weight: 800; font-family: inherit;
+    border-radius: 999px; transition: transform .08s ease, filter .15s;
+  }
+  .btn:active { transform: scale(.95); filter: brightness(1.1); }
+  .btn-yellow {
+    background: linear-gradient(180deg, #f3ef4e, #d8d520);
+    color: #3a3a00; font-size: 20px; padding: 16px 0; width: 75%;
+    margin: 0 auto; box-shadow: 0 6px 0 #a8a210, 0 10px 20px rgba(0,0,0,.3);
+  }
+  .btn-ghost { background: rgba(255,255,255,.15); color: #fff; font-size: 14px; padding: 10px 22px; }
+  .topbar {
+    background: rgba(0,0,0,.35); padding: 14px 16px; text-align: center;
+    color: #fff; font-size: 15px; font-weight: 700; flex-shrink: 0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topbar .back {
+    background: #ff5d8f; border: none; color: #fff; width: 36px; height: 36px;
+    border-radius: 50%; font-size: 18px; cursor: pointer; flex-shrink: 0;
+  }
+  .topbar .title { flex: 1; }
+  .topbar .title em { color: #ffe14d; font-style: normal; }
+  .topbar .title small { display: block; font-weight: 400; font-size: 11px; opacity: .75; margin-top: 3px; }
+
+  /* ───── 1. 대기 화면 ───── */
+  #scr-idle { justify-content: center; align-items: center; cursor: pointer; gap: 40px; }
+  #scr-idle .touch-banner {
+    background: #4527a0; color: #fff; font-size: 18px; font-weight: 800;
+    padding: 14px 34px; border-radius: 999px;
+    animation: pulse 1.6s infinite;
+    box-shadow: 0 0 0 0 rgba(255,255,255,.5);
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,255,255,.45); }
+    70% { box-shadow: 0 0 0 22px rgba(255,255,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  }
+  .bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .bubbles i {
+    position: absolute; display: block; border-radius: 50%;
+    background: rgba(255,255,255,.08);
+    animation: rise linear infinite;
+  }
+  @keyframes rise { from { transform: translateY(110vh);} to { transform: translateY(-20vh);} }
+  #scr-idle .copyright { position: absolute; bottom: 16px; font-size: 11px; color: rgba(255,255,255,.5); }
+
+  /* ───── 2. 시리즈 목록 ───── */
+  #series-list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .series-card {
+    background: rgba(0,0,0,.45); border-radius: 16px; padding: 16px;
+    color: #fff; cursor: pointer; position: relative; overflow: hidden;
+    border: 2px solid transparent; transition: border-color .2s;
+  }
+  .series-card:active { border-color: #ffe14d; }
+  .series-card .emoji { font-size: 44px; float: right; margin-left: 12px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
+  .series-card h3 { font-size: 18px; margin-bottom: 4px; }
+  .series-card .en { font-size: 11px; opacity: .65; letter-spacing: 1px; margin-bottom: 10px; }
+  .series-card .meta { display: flex; align-items: center; gap: 12px; }
+  .series-card .stock { font-size: 13px; }
+  .series-card .stock b { color: #ffe14d; font-size: 17px; }
+  .series-card .price {
+    background: #1c1c1c; padding: 5px 14px; border-radius: 999px;
+    font-size: 14px; font-weight: 800;
+  }
+  .series-card .num {
+    position: absolute; top: 14px; left: -6px;
+    background: #1c1c1c; color: #fff; font-size: 12px; font-weight: 800;
+    padding: 4px 14px 4px 16px; clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%);
+    display: none;
+  }
+  .series-card.soldout { filter: grayscale(1) brightness(.6); pointer-events: none; }
+  .series-card .soldout-badge {
+    position: absolute; top: 12px; right: 12px; background: #d32f2f; color: #fff;
+    font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 6px;
+    transform: rotate(8deg); display: none;
+  }
+  .series-card.soldout .soldout-badge { display: block; }
+
+  /* ───── 3. 경품 상세 ───── */
+  #prize-grid { flex: 1; overflow-y: auto; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+  .prize-cell {
+    background: rgba(255,255,255,.93); border-radius: 14px; padding: 12px;
+    position: relative; min-height: 110px;
+  }
+  .prize-cell.wide { grid-column: span 2; background: linear-gradient(135deg, #ffe9a8, #ffd34d); }
+  .prize-cell .grade {
+    position: absolute; top: -6px; left: -6px;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: #1c1c1c; color: #ffe14d;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 15px; box-shadow: 0 3px 8px rgba(0,0,0,.35);
+  }
+  .prize-cell .p-emoji { font-size: 34px; text-align: center; margin: 4px 0 6px; }
+  .prize-cell .p-name { font-size: 12.5px; font-weight: 700; color: #222; text-align: center; line-height: 1.35; min-height: 34px; }
+  .prize-cell .p-stock { text-align: center; font-size: 11px; color: #666; margin-top: 6px; }
+  .prize-cell .p-stock b { color: #d32f2f; font-size: 14px; }
+  .stock-bar { height: 7px; background: #ddd; border-radius: 4px; margin-top: 5px; overflow: hidden; }
+  .stock-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ff9800, #ff5722); border-radius: 4px; }
+  .detail-footer { flex-shrink: 0; padding: 12px 0 18px; background: rgba(0,0,0,.25); }
+  .detail-footer .hint { text-align: center; color: rgba(255,255,255,.8); font-size: 12px; margin-bottom: 10px; }
+
+  /* ───── 4. 참여 횟수 모달 ───── */
+  .modal-wrap {
+    position: absolute; inset: 0; background: rgba(10,5,30,.75);
+    display: none; align-items: center; justify-content: center; z-index: 50;
+    animation: fadeIn .25s;
+  }
+  .modal-wrap.active { display: flex; }
+  .modal {
+    width: 86%; background: linear-gradient(180deg, #6a4fc9, #533aa8);
+    border-radius: 24px; border: 3px solid #b9a6ff;
+    padding: 30px 24px; text-align: center; color: #fff;
+  }
+  .modal .mascot { font-size: 52px; margin-bottom: 8px; }
+  .modal h2 { font-size: 20px; margin-bottom: 22px; }
+  .counter { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 6px; }
+  .counter .cnt-btn {
+    width: 52px; height: 52px; border-radius: 50%; border: none;
+    background: #3b2a6e; color: #fff; font-size: 26px; font-weight: 900; cursor: pointer;
+  }
+  .counter .cnt-btn:active { background: #ffe14d; color: #333; }
+  .counter .cnt-val {
+    width: 90px; background: #fff; color: #222; border-radius: 14px;
+    font-size: 34px; font-weight: 900; padding: 8px 0;
+  }
+  .counter .side { font-size: 13px; background: rgba(0,0,0,.3); padding: 6px 12px; border-radius: 999px; }
+  .total-label { font-size: 13px; color: #cfc3ff; margin-top: 16px; }
+  .total-price { font-size: 32px; font-weight: 900; color: #b9ff4d; margin: 4px 0 22px; }
+
+  /* ───── 5. 결제 ───── */
+  #scr-pay { justify-content: center; align-items: center; gap: 18px; text-align: center; color: #fff; }
+  #scr-pay h2 { font-size: 21px; }
+  #scr-pay .pay-info { font-size: 14px; opacity: .85; }
+  #scr-pay .pay-amount { font-size: 36px; font-weight: 900; color: #b9ff4d; }
+  .card-anim {
+    width: 130px; height: 84px; border-radius: 12px;
+    background: linear-gradient(135deg, #4a90d9, #7b5bd6);
+    border: 2px solid #fff; position: relative; margin: 14px 0;
+    animation: swipe 1.4s ease-in-out infinite;
+  }
+  .card-anim::after {
+    content: ''; position: absolute; top: 16px; left: 0; right: 0; height: 14px; background: #222;
+  }
+  @keyframes swipe {
+    0%, 100% { transform: translateX(-30px) rotate(-4deg); }
+    50% { transform: translateX(30px) rotate(4deg); }
+  }
+  #scr-pay .notice { background: rgba(0,0,0,.4); padding: 8px 18px; border-radius: 8px; font-size: 13px; color: #ffe14d; }
+
+  /* ───── 6. 뽑기 ───── */
+  #scr-draw { align-items: center; color: #fff; }
+  #scr-draw .draw-head { margin-top: 36px; text-align: center; }
+  #scr-draw .draw-head h2 { font-size: 22px; }
+  #scr-draw .draw-head p { font-size: 13px; opacity: .8; margin-top: 6px; }
+  #ticket-box {
+    flex: 1; width: 100%; display: flex; flex-wrap: wrap; gap: 12px;
+    align-content: center; justify-content: center; padding: 20px 28px;
+  }
+  .ticket {
+    width: 64px; height: 88px; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(180deg, #fdf6e3, #f5e6bd);
+    border: 2px dashed #c9a86a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #a8854a; font-weight: 900;
+    box-shadow: 0 4px 10px rgba(0,0,0,.35);
+    transition: transform .15s;
+    animation: wobble 2.4s ease-in-out infinite;
+  }
+  .ticket:nth-child(2n) { animation-delay: .4s; }
+  .ticket:nth-child(3n) { animation-delay: .9s; }
+  @keyframes wobble { 0%,100% { transform: rotate(-3deg);} 50% { transform: rotate(3deg);} }
+  .ticket:active { transform: scale(1.15); }
+  .ticket.picked { visibility: hidden; }
+
+  /* ───── 7. 결과 연출 ───── */
+  #scr-reveal { justify-content: center; align-items: center; gap: 10px; color: #fff; }
+  #reveal-card {
+    width: 230px; height: 310px; border-radius: 20px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: #fff; color: #222;
+    animation: cardIn .55s cubic-bezier(.2,1.6,.4,1);
+    box-shadow: 0 0 50px rgba(255,225,77,.45);
+  }
+  @keyframes cardIn { from { transform: scale(.2) rotate(-12deg); opacity: 0;} to { transform: none; opacity: 1;} }
+  #reveal-card .r-grade {
+    width: 76px; height: 76px; border-radius: 50%;
+    background: #1c1c1c; color: #ffe14d;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 900;
+  }
+  #reveal-card .r-emoji { font-size: 58px; }
+  #reveal-card .r-name { font-size: 15px; font-weight: 800; text-align: center; padding: 0 16px; line-height: 1.4; }
+  #reveal-card.high { background: linear-gradient(160deg, #fff7d6, #ffe14d); }
+  #reveal-sub { font-size: 14px; opacity: .85; margin-top: 8px; }
+  .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+  .confetti i {
+    position: absolute; width: 10px; height: 14px; top: -20px;
+    animation: drop linear forwards;
+  }
+  @keyframes drop { to { transform: translateY(110vh) rotate(720deg); } }
+
+  /* ───── 8. 최종 결과 ───── */
+  #scr-result { color: #fff; }
+  #scr-result .res-head { text-align: center; padding: 34px 0 14px; }
+  #scr-result .res-head h2 { font-size: 24px; }
+  #result-list { flex: 1; overflow-y: auto; padding: 8px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .res-row {
+    background: rgba(255,255,255,.94); border-radius: 14px; color: #222;
+    display: flex; align-items: center; gap: 14px; padding: 12px 16px;
+    animation: fadeIn .4s ease both;
+  }
+  .res-row .rr-grade {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    background: #1c1c1c; color: #ffe14d; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .res-row .rr-name { font-size: 14px; font-weight: 700; flex: 1; }
+  .res-row .rr-emoji { font-size: 28px; }
+  .res-row.lastone { background: linear-gradient(135deg, #ffe9a8, #ffce3d); }
+  #scr-result .res-footer { padding: 14px 0 22px; }
+</style>
+</head>
+<body>
+<div id="kiosk">
+
+  <!-- 1. 대기 화면 -->
+  <div class="screen active" id="scr-idle" onclick="goSeries()">
+    <div class="bubbles" id="bubbles"></div>
+    <div class="logo-diamond"><span>이벤트<br>쿠지<small>EVENT KUJI</small></span></div>
+    <div class="touch-banner">화면을 터치하면 시작합니다.</div>
+    <div class="copyright">2026 © Com2uS Event Game Prototype</div>
+  </div>
+
+  <!-- 2. 시리즈 목록 -->
+  <div class="screen" id="scr-series">
+    <div class="topbar">
+      <button class="back" onclick="showScreen('scr-idle')">←</button>
+      <div class="title">상품을 선택하고 <em>'시작하기'</em> 버튼을 누르세요.
+        <small>상품의 종류 및 상세 정보를 확인할 수 있습니다.</small>
+      </div>
+    </div>
+    <div id="series-list"></div>
+  </div>
+
+  <!-- 3. 경품 상세 -->
+  <div class="screen" id="scr-detail">
+    <div class="topbar">
+      <button class="back" onclick="showScreen('scr-series')">←</button>
+      <div class="title" id="detail-title"></div>
+    </div>
+    <div id="prize-grid"></div>
+    <div class="detail-footer">
+      <div class="hint">상품을 터치하면 상세정보를 확인할 수 있습니다.</div>
+      <button class="btn btn-yellow" onclick="openCount()">구매하기</button>
+    </div>
+  </div>
+
+  <!-- 4. 참여 횟수 모달 -->
+  <div class="modal-wrap" id="modal-count">
+    <div class="modal">
+      <div class="mascot">🎟️</div>
+      <h2>참여 횟수를 정해주세요.</h2>
+      <div class="counter">
+        <span class="side">1</span>
+        <button class="cnt-btn" onclick="changeCount(-1)">−</button>
+        <div class="cnt-val" id="cnt-val">1</div>
+        <button class="cnt-btn" onclick="changeCount(1)">＋</button>
+        <span class="side" id="cnt-max">10</span>
+      </div>
+      <div class="total-label">합계 금액</div>
+      <div class="total-price" id="total-price">₩13,000</div>
+      <button class="btn btn-yellow" style="width:60%" onclick="goPay()">확인</button>
+      <div style="margin-top:14px">
+        <button class="btn btn-ghost" onclick="closeCount()">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 결제 -->
+  <div class="screen" id="scr-pay">
+    <h2>아래 내역으로 결제를 진행합니다.</h2>
+    <div class="pay-info">참여 횟수 <b id="pay-count">1</b>회</div>
+    <div class="total-label">합계 금액</div>
+    <div class="pay-amount" id="pay-amount">₩13,000</div>
+    <div class="card-anim"></div>
+    <div class="notice">※ 카드 결제만 가능합니다. (시연용: 자동 승인)</div>
+  </div>
+
+  <!-- 6. 뽑기 -->
+  <div class="screen" id="scr-draw">
+    <div class="draw-head">
+      <h2>티켓을 뽑아주세요!</h2>
+      <p id="draw-progress"></p>
+    </div>
+    <div id="ticket-box"></div>
+  </div>
+
+  <!-- 7. 결과 연출 -->
+  <div class="screen" id="scr-reveal" onclick="nextAfterReveal()">
+    <div id="reveal-card">
+      <div class="r-grade" id="r-grade">A상</div>
+      <div class="r-emoji" id="r-emoji">🏆</div>
+      <div class="r-name" id="r-name"></div>
+    </div>
+    <div id="reveal-sub">화면을 터치하면 계속합니다.</div>
+  </div>
+
+  <!-- 8. 최종 결과 -->
+  <div class="screen" id="scr-result">
+    <div class="res-head"><h2>🎉 당첨 결과</h2></div>
+    <div id="result-list"></div>
+    <div class="res-footer">
+      <button class="btn btn-yellow" onclick="resetToIdle()">처음으로</button>
+    </div>
+  </div>
+
+  <div class="confetti" id="confetti"></div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────
+   상품 데이터 — 여기 숫자/이름만 바꾸면 됩니다.
+   count: 등급별 초기 수량 (합계가 전체 티켓 수)
+   ───────────────────────────────────────────── */
+const SERIES = [
+  {
+    id: 'sw', name: '서머너즈 워', en: 'SUMMONERS WAR COLLECTION', emoji: '⚔️', price: 13000,
+    prizes: [
+      { grade: 'A상', name: '발키리 MASTERLISE 피규어', emoji: '🗡️', count: 2 },
+      { grade: 'B상', name: '이프리트 MASTERLISE 피규어', emoji: '🔥', count: 2 },
+      { grade: 'C상', name: '아크엔젤 빅 쿠션', emoji: '👼', count: 4 },
+      { grade: 'D상', name: '아크릴 스탠드 (랜덤)', emoji: '🎴', count: 8 },
+      { grade: 'E상', name: '러버 참 (랜덤)', emoji: '🧸', count: 10 },
+      { grade: 'F상', name: '클리어 포스터 (선택)', emoji: '🖼️', count: 14 },
+    ],
+    lastOne: { grade: 'LAST ONE', name: '발키리 스페셜 컬러 ver. 피규어', emoji: '👑' },
+  },
+  {
+    id: 'mn', name: '미니게임천국', en: 'MINIGAME PARADISE', emoji: '🐥', price: 12000,
+    prizes: [
+      { grade: 'A상', name: '돌아온 액션퍼즐패밀리 빅 피규어', emoji: '🏆', count: 2 },
+      { grade: 'B상', name: '미니게임천국 캐릭터 인형', emoji: '🪅', count: 3 },
+      { grade: 'C상', name: '캐릭터 무드등', emoji: '💡', count: 5 },
+      { grade: 'D상', name: '미니 타올 (랜덤)', emoji: '🧻', count: 10 },
+      { grade: 'E상', name: '스티커 세트', emoji: '✨', count: 15 },
+    ],
+    lastOne: { grade: 'LAST ONE', name: '골드 에디션 피규어', emoji: '👑' },
+  },
+  {
+    id: 'cm', name: '컴투스프로야구', en: 'COM2US PRO BASEBALL', emoji: '⚾', price: 10000,
+    prizes: [
+      { grade: 'A상', name: '구단 마스코트 피규어', emoji: '🦁', count: 2 },
+      { grade: 'B상', name: '사인볼 레플리카', emoji: '⚾', count: 4 },
+      { grade: 'C상', name: '응원 타올', emoji: '🏟️', count: 8 },
+      { grade: 'D상', name: '선수 카드 팩', emoji: '🃏', count: 16 },
+    ],
+    lastOne: { grade: 'LAST ONE', name: 'MVP 골드 피규어', emoji: '👑' },
+  },
+];
+
+/* ───── 재고 상태 (localStorage에 저장 — 새로고침해도 유지) ───── */
+const SAVE_KEY = 'kuji-stock-v1';
+let stock = loadStock();
+
+function freshStock() {
+  const s = {};
+  SERIES.forEach(sr => { s[sr.id] = sr.prizes.map(p => p.count); });
+  return s;
+}
+function loadStock() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) { const s = JSON.parse(raw); if (SERIES.every(sr => Array.isArray(s[sr.id]) && s[sr.id].length === sr.prizes.length)) return s; }
+  } catch (e) {}
+  return freshStock();
+}
+function saveStock() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(stock)); } catch (e) {} }
+function remainOf(sr) { return stock[sr.id].reduce((a, b) => a + b, 0); }
+function totalOf(sr) { return sr.prizes.reduce((a, p) => a + p.count, 0); }
+
+/* ───── 화면 전환 ───── */
+let current = null;     // 선택된 시리즈
+let drawCount = 1;      // 참여 횟수
+let queue = [];         // 이번 결제에서 뽑을 티켓 수
+let results = [];       // 이번 회차 당첨 내역
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ───── 1 → 2 ───── */
+function goSeries() {
+  renderSeries();
+  showScreen('scr-series');
+}
+function renderSeries() {
+  const list = document.getElementById('series-list');
+  list.innerHTML = '';
+  SERIES.forEach((sr, i) => {
+    const remain = remainOf(sr), total = totalOf(sr);
+    const card = document.createElement('div');
+    card.className = 'series-card' + (remain === 0 ? ' soldout' : '');
+    card.innerHTML = `
+      <div class="soldout-badge">SOLD OUT</div>
+      <span class="emoji">${sr.emoji}</span>
+      <h3>${sr.name}</h3>
+      <div class="en">${sr.en}</div>
+      <div class="meta">
+        <span class="stock">잔여량 <b>${remain}</b> / ${total}</span>
+        <span class="price">₩${sr.price.toLocaleString()}</span>
+      </div>`;
+    card.onclick = () => { current = sr; renderDetail(); showScreen('scr-detail'); };
+    list.appendChild(card);
+  });
+}
+
+/* ───── 3. 경품 상세 ───── */
+function renderDetail() {
+  document.getElementById('detail-title').innerHTML =
+    `${current.name} <em>잔여량 ${remainOf(current)}/${totalOf(current)}</em><small>${current.en}</small>`;
+  const grid = document.getElementById('prize-grid');
+  grid.innerHTML = '';
+  current.prizes.forEach((p, i) => {
+    const left = stock[current.id][i];
+    const cell = document.createElement('div');
+    cell.className = 'prize-cell';
+    cell.innerHTML = `
+      <div class="grade">${p.grade.replace('상', '')}<small style="font-size:9px">상</small></div>
+      <div class="p-emoji">${p.emoji}</div>
+      <div class="p-name">${p.name}</div>
+      <div class="p-stock">잔여량 <b>${left}</b> / ${p.count}</div>
+      <div class="stock-bar"><i style="width:${p.count ? (left / p.count * 100) : 0}%"></i></div>`;
+    grid.appendChild(cell);
+  });
+  const lo = document.createElement('div');
+  lo.className = 'prize-cell wide';
+  lo.innerHTML = `
+    <div class="grade" style="background:#b8860b;color:#fff;font-size:10px">LAST<br>ONE</div>
+    <div class="p-emoji">${current.lastOne.emoji}</div>
+    <div class="p-name">${current.lastOne.name}<br><small style="color:#8a6d00">마지막 티켓을 뽑으면 추가 증정!</small></div>`;
+  grid.appendChild(lo);
+}
+
+/* ───── 4. 참여 횟수 ───── */
+function openCount() {
+  drawCount = 1;
+  updateCount();
+  document.getElementById('modal-count').classList.add('active');
+}
+function closeCount() { document.getElementById('modal-count').classList.remove('active'); }
+function changeCount(d) {
+  const max = Math.min(remainOf(current), 10);
+  drawCount = Math.max(1, Math.min(max, drawCount + d));
+  updateCount();
+}
+function updateCount() {
+  document.getElementById('cnt-val').textContent = drawCount;
+  document.getElementById('cnt-max').textContent = Math.min(remainOf(current), 10);
+  document.getElementById('total-price').textContent = '₩' + (drawCount * current.price).toLocaleString();
+}
+
+/* ───── 5. 결제 (시연용 자동 승인) ───── */
+function goPay() {
+  closeCount();
+  document.getElementById('pay-count').textContent = drawCount;
+  document.getElementById('pay-amount').textContent = '₩' + (drawCount * current.price).toLocaleString();
+  showScreen('scr-pay');
+  setTimeout(startDraw, 2200);
+}
+
+/* ───── 6. 뽑기 ───── */
+function startDraw() {
+  queue = drawCount;
+  results = [];
+  renderTickets();
+  showScreen('scr-draw');
+}
+function renderTickets() {
+  document.getElementById('draw-progress').textContent =
+    `${results.length + 1} / ${drawCount} 번째 — 마음에 드는 티켓을 터치!`;
+  const box = document.getElementById('ticket-box');
+  box.innerHTML = '';
+  const n = Math.min(remainOf(current), 12);
+  for (let i = 0; i < n; i++) {
+    const t = document.createElement('div');
+    t.className = 'ticket';
+    t.textContent = 'く';
+    t.onclick = () => pickTicket(t);
+    box.appendChild(t);
+  }
+}
+function pickTicket(el) {
+  el.classList.add('picked');
+  // 잔여 티켓에서 비복원 추첨
+  const pool = [];
+  stock[current.id].forEach((c, i) => { for (let k = 0; k < c; k++) pool.push(i); });
+  const idx = pool[Math.floor(Math.random() * pool.length)];
+  stock[current.id][idx]--;
+  saveStock();
+  const prize = current.prizes[idx];
+  const isLastOne = remainOf(current) === 0;
+  results.push({ grade: prize.grade, name: prize.name, emoji: prize.emoji, high: idx <= 1 });
+  if (isLastOne) results.push({ grade: 'LAST ONE', name: current.lastOne.name, emoji: current.lastOne.emoji, high: true, lastone: true });
+  showReveal(results[results.length - (isLastOne ? 2 : 1)], isLastOne);
+}
+function showReveal(r, lastOneFollows) {
+  const card = document.getElementById('reveal-card');
+  card.classList.toggle('high', !!r.high);
+  document.getElementById('r-grade').textContent = r.grade;
+  document.getElementById('r-emoji').textContent = r.emoji;
+  document.getElementById('r-name').textContent = r.name;
+  document.getElementById('reveal-sub').textContent =
+    lastOneFollows ? '🎊 마지막 티켓! LAST ONE상도 함께 증정됩니다! (터치)' : '화면을 터치하면 계속합니다.';
+  if (r.high) fireConfetti();
+  showScreen('scr-reveal');
+}
+function nextAfterReveal() {
+  if (results.length < drawCount && remainOf(current) > 0) {
+    renderTickets();
+    showScreen('scr-draw');
+  } else {
+    renderResult();
+    showScreen('scr-result');
+  }
+}
+
+/* ───── 8. 최종 결과 ───── */
+function renderResult() {
+  const list = document.getElementById('result-list');
+  list.innerHTML = '';
+  results.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'res-row' + (r.lastone ? ' lastone' : '');
+    row.style.animationDelay = (i * .12) + 's';
+    row.innerHTML = `
+      <div class="rr-grade">${r.grade.replace('상', '')}</div>
+      <div class="rr-name">${r.name}</div>
+      <div class="rr-emoji">${r.emoji}</div>`;
+    list.appendChild(row);
+  });
+  if (results.some(r => r.high)) fireConfetti();
+}
+function resetToIdle() { showScreen('scr-idle'); }
+
+/* ───── 연출 효과 ───── */
+function fireConfetti() {
+  const wrap = document.getElementById('confetti');
+  const colors = ['#ffe14d', '#ff5d8f', '#4dd0ff', '#b9ff4d', '#ff9800'];
+  for (let i = 0; i < 36; i++) {
+    const c = document.createElement('i');
+    c.style.left = Math.random() * 100 + '%';
+    c.style.background = colors[i % colors.length];
+    c.style.animationDuration = (1.2 + Math.random() * 1.4) + 's';
+    c.style.animationDelay = (Math.random() * .4) + 's';
+    wrap.appendChild(c);
+    setTimeout(() => c.remove(), 3200);
+  }
+}
+(function makeBubbles() {
+  const wrap = document.getElementById('bubbles');
+  for (let i = 0; i < 14; i++) {
+    const b = document.createElement('i');
+    const size = 14 + Math.random() * 60;
+    b.style.width = b.style.height = size + 'px';
+    b.style.left = Math.random() * 100 + '%';
+    b.style.animationDuration = (7 + Math.random() * 9) + 's';
+    b.style.animationDelay = (-Math.random() * 10) + 's';
+    wrap.appendChild(b);
+  }
+})();
+
+/* ───── 관리자: 재고 리셋 (키보드 R 키) ───── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'r' || e.key === 'R') {
+    if (confirm('모든 재고를 초기화할까요? (관리자 기능)')) {
+      stock = freshStock(); saveStock();
+      alert('재고가 초기화되었습니다.');
+      if (document.getElementById('scr-series').classList.contains('active')) renderSeries();
+      if (document.getElementById('scr-detail').classList.contains('active')) renderDetail();
+    }
+  }
+});
+</script>
+</body>
+</html>
