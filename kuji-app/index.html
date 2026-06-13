@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1030">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<title>컴투스 팝업 쿠지</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+  html, body { height:100%; overscroll-behavior:none; }
+  body {
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    background:#0e0820; display:flex; justify-content:center;
+    overflow:hidden; user-select:none; touch-action:manipulation;
+  }
+  #kiosk {
+    width:100%; max-width:520px; height:100vh; height:100dvh;
+    background:linear-gradient(160deg,#3b2a6e 0%,#5d3fa8 40%,#7b5bd6 100%);
+    position:relative; overflow:hidden; box-shadow:0 0 60px rgba(0,0,0,.6);
+  }
+  .screen { position:absolute; inset:0; display:none; flex-direction:column; animation:fadeIn .35s ease; }
+  .screen.active { display:flex; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+
+  /* 공통 */
+  .btn { border:none; cursor:pointer; font-weight:800; font-family:inherit; border-radius:999px; transition:transform .08s,filter .15s; }
+  .btn:active { transform:scale(.96); filter:brightness(1.08); }
+  .btn-yellow { display:block; background:linear-gradient(180deg,#f3ef4e,#d8d520); color:#3a3a00; font-size:20px; padding:16px 0; width:78%; margin:0 auto; box-shadow:0 6px 0 #a8a210,0 10px 20px rgba(0,0,0,.3); }
+  .btn-yellow:disabled { filter:grayscale(.8) brightness(.8); box-shadow:none; cursor:default; }
+  .btn-ghost { background:rgba(255,255,255,.15); color:#fff; font-size:14px; padding:10px 22px; }
+  .topbar { background:rgba(0,0,0,.38); padding:14px 16px; color:#fff; font-size:15px; font-weight:700; flex-shrink:0; display:flex; align-items:center; gap:10px; }
+  .topbar .back { background:#ff5d8f; border:none; color:#fff; width:40px; height:40px; min-width:40px; border-radius:50%; font-size:20px; cursor:pointer; }
+  .topbar .title { flex:1; line-height:1.3; }
+  .topbar .title em { color:#ffe14d; font-style:normal; }
+  .topbar .title small { display:block; font-weight:400; font-size:11px; opacity:.75; margin-top:3px; }
+  .logo-diamond { width:140px; height:140px; margin:0 auto; background:#1c1c1c; transform:rotate(45deg); display:flex; align-items:center; justify-content:center; border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .logo-diamond span { transform:rotate(-45deg); color:#fff; font-weight:900; font-size:24px; text-align:center; line-height:1.25; }
+  .logo-diamond small { display:block; font-size:10px; letter-spacing:3px; color:#f44; margin-top:4px; }
+  .img-fallback { display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#efe7ff,#d9c9ff); color:#5d3fa8; font-weight:800; }
+
+  /* S1 대기 */
+  #scr-idle { justify-content:center; align-items:center; cursor:pointer; gap:38px; }
+  #idle-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+  #scr-idle > *:not(#idle-video):not(.bubbles):not(#admin-tap) { position:relative; z-index:2; }
+  #scr-idle .touch-banner { background:#4527a0; color:#fff; font-size:18px; font-weight:800; padding:14px 34px; border-radius:999px; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,255,255,.45)} 70%{box-shadow:0 0 0 22px rgba(255,255,255,0)} 100%{box-shadow:0 0 0 0 rgba(255,255,255,0)} }
+  #scr-idle.soldout .touch-banner { background:#444; animation:none; }
+  .bubbles { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1; }
+  .bubbles i { position:absolute; display:block; border-radius:50%; background:rgba(255,255,255,.08); animation:rise linear infinite; }
+  @keyframes rise { from{transform:translateY(110vh)} to{transform:translateY(-20vh)} }
+  #admin-tap { position:absolute; top:0; right:0; width:110px; height:110px; z-index:9; }
+  #scr-idle .copyright { position:absolute; bottom:16px; font-size:11px; color:rgba(255,255,255,.5); }
+
+  /* S2 IP 선택 */
+  #ip-hero { flex-shrink:0; height:200px; position:relative; overflow:hidden; display:flex; align-items:flex-end; }
+  #ip-hero img, #ip-hero .img-fallback { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; font-size:30px; }
+  #ip-hero h1 { position:relative; z-index:2; color:#fff; font-size:26px; font-weight:900; padding:18px; text-shadow:0 3px 12px rgba(0,0,0,.8); background:linear-gradient(to top,rgba(0,0,0,.65),transparent); width:100%; }
+  #ip-list { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
+  .ip-card { background:rgba(0,0,0,.45); border-radius:16px; overflow:hidden; color:#fff; cursor:pointer; border:2px solid transparent; transition:border-color .2s; display:flex; height:118px; position:relative; }
+  .ip-card:active { border-color:#ffe14d; }
+  .ip-card .ipimg { width:150px; flex-shrink:0; object-fit:cover; font-size:40px; }
+  .ip-card .ipinfo { flex:1; padding:14px; display:flex; flex-direction:column; justify-content:center; gap:8px; }
+  .ip-card .ipinfo h3 { font-size:19px; }
+  .ip-card .ipinfo .stock { font-size:14px; } .ip-card .ipinfo .stock b { color:#ffe14d; font-size:18px; }
+  .ip-card .gauge { height:8px; background:rgba(255,255,255,.2); border-radius:4px; overflow:hidden; }
+  .ip-card .gauge i { display:block; height:100%; background:linear-gradient(90deg,#ffe14d,#ff9800); }
+  .ip-card.soldout { filter:grayscale(1) brightness(.55); pointer-events:none; }
+  .ip-card .soldout-badge { position:absolute; top:10px; right:10px; background:#d32f2f; color:#fff; font-size:12px; font-weight:800; padding:4px 12px; border-radius:6px; transform:rotate(8deg); display:none; }
+  .ip-card.soldout .soldout-badge { display:block; }
+
+  /* S3 경품 라인업 — 가로형 카드 (등급 뱃지 + 이미지 좌 / 이름·잔여 우) */
+  #prize-grid { flex:1; overflow-y:auto; padding:14px; display:grid; grid-template-columns:1fr 1fr; gap:10px; align-content:start; }
+  .prize-cell { display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.94); border-radius:14px; padding:12px 12px 12px 8px; position:relative; }
+  .prize-cell.lucky { background:linear-gradient(135deg,#ffe9a8,#ffd34d); }
+  .prize-cell .grade { flex-shrink:0; width:64px; height:64px; border-radius:50%; background:#1c1c1c; color:#ffe14d; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:20px; box-shadow:0 3px 8px rgba(0,0,0,.35); }
+  .prize-cell.lucky .grade { background:#b8860b; color:#fff; font-size:14px; }
+  .prize-cell .p-img { flex-shrink:0; width:96px; height:96px; border-radius:10px; object-fit:contain; background:#f1ecff; font-size:42px; }
+  .prize-cell .p-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .prize-cell .p-name { font-size:15px; font-weight:700; color:#222; line-height:1.32; }
+  .prize-cell .p-stock { font-size:12px; color:#666; }
+  .prize-cell .p-stock b { color:#d32f2f; font-size:15px; }
+  .ticket-gauge { display:flex; flex-wrap:wrap; gap:3px; }
+  .ticket-gauge i { width:11px; height:14px; border-radius:2px; background:#ddd; }
+  .ticket-gauge i.on { background:linear-gradient(180deg,#ffcf5a,#ff9800); }
+  .prize-cell.out { filter:grayscale(1) opacity(.6); }
+  .prize-cell .out-badge { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.45); color:#fff; font-weight:900; font-size:18px; border-radius:14px; }
+  .prize-cell.out .out-badge { display:flex; }
+  .lineup-footer { flex-shrink:0; padding:12px 0 18px; background:rgba(0,0,0,.25); }
+  .lineup-footer .hint { text-align:center; color:rgba(255,255,255,.82); font-size:12px; margin-bottom:10px; }
+
+  /* S4 뽑기 — 중앙 팝업 박스 + NPC */
+  #scr-draw { color:#fff; }
+  #draw-stage { flex:1; display:flex; align-items:center; justify-content:center; padding:20px; }
+  #draw-box { width:100%; max-width:380px; background:linear-gradient(180deg,#6a4fc9,#4a338f); border:3px solid #b9a6ff; border-radius:26px; padding:24px 22px 28px; text-align:center; box-shadow:0 16px 44px rgba(0,0,0,.45); display:flex; flex-direction:column; align-items:center; gap:18px; animation:cardIn .5s cubic-bezier(.2,1.5,.4,1); }
+  #draw-box .npc-art { width:285px; height:285px; border-radius:18px; overflow:hidden; font-size:108px; display:flex; align-items:center; justify-content:center; }
+  #draw-box .npc-art img, #draw-box .npc-art video { width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block; }
+  #draw-box .draw-msg { font-size:17px; font-weight:700; }
+  #ticket-box { flex:1; width:100%; display:flex; flex-wrap:wrap; gap:14px; align-content:center; justify-content:center; padding:16px 28px; }
+  .ticket { width:66px; height:90px; border-radius:8px; cursor:pointer; background:linear-gradient(180deg,#fdf6e3,#f5e6bd); border:2px dashed #c9a86a; display:flex; align-items:center; justify-content:center; font-size:26px; color:#a8854a; font-weight:900; box-shadow:0 4px 10px rgba(0,0,0,.35); transition:transform .15s; animation:wobble 2.4s ease-in-out infinite; }
+  .ticket:nth-child(2n){animation-delay:.4s} .ticket:nth-child(3n){animation-delay:.9s}
+  @keyframes wobble { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+  .ticket:active { transform:scale(1.15); }
+  .ticket.disabled { pointer-events:none; }
+  .ticket.opening { animation:ticketOpen .5s forwards; }
+  @keyframes ticketOpen { to{transform:scale(2.4);opacity:0} }
+
+  /* S5 당첨 연출 */
+  #scr-reveal { justify-content:center; align-items:center; gap:10px; color:#fff; }
+  #reveal-card { width:250px; min-height:330px; border-radius:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:22px; background:#fff; color:#222; animation:cardIn .55s cubic-bezier(.2,1.6,.4,1); box-shadow:0 0 50px rgba(255,225,77,.45); }
+  @keyframes cardIn { from{transform:scale(.2) rotate(-12deg);opacity:0} to{transform:none;opacity:1} }
+  #reveal-card .r-grade { width:80px; height:80px; border-radius:50%; background:#1c1c1c; color:#ffe14d; display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:900; }
+  #reveal-card .r-img { width:120px; height:120px; border-radius:12px; object-fit:cover; font-size:60px; }
+  #reveal-card .r-name { font-size:16px; font-weight:800; text-align:center; line-height:1.4; }
+  #reveal-card.high { background:linear-gradient(160deg,#fff7d6,#ffe14d); box-shadow:0 0 70px rgba(255,200,0,.8); }
+  #reveal-sub { font-size:14px; opacity:.9; margin-top:8px; }
+  /* 번개 이펙트 */
+  #fx-flash { position:absolute; inset:0; background:radial-gradient(circle,#fff8d0,#ffd34d 60%,transparent); opacity:0; pointer-events:none; z-index:30; }
+  #fx-flash.go { animation:flash .6s ease-out; }
+  @keyframes flash { 0%{opacity:0} 12%{opacity:.95} 30%{opacity:.2} 45%{opacity:.85} 100%{opacity:0} }
+  .shake { animation:shake .5s; }
+  @keyframes shake { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-8px,4px)} 40%{transform:translate(8px,-4px)} 60%{transform:translate(-6px,-3px)} 80%{transform:translate(6px,3px)} }
+  .bolt { position:absolute; top:-10%; width:6px; height:60%; background:linear-gradient(#fff,#ffd34d); box-shadow:0 0 16px #ffe14d; z-index:31; opacity:0; transform-origin:top; }
+  .bolt.go { animation:boltGo .5s ease-out; }
+  @keyframes boltGo { 0%{opacity:0;transform:scaleY(0)} 20%{opacity:1;transform:scaleY(1)} 100%{opacity:0} }
+  .confetti { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:25; }
+  .confetti i { position:absolute; width:10px; height:14px; top:-20px; animation:drop linear forwards; }
+  @keyframes drop { to{transform:translateY(110vh) rotate(720deg)} }
+
+  /* S6 결과 (스태프 제시) */
+  #scr-result { color:#fff; justify-content:center; align-items:center; gap:16px; padding:20px; overflow-y:auto; }
+  #scr-result h2 { font-size:30px; }
+  #result-card { background:#fff; color:#222; border-radius:22px; width:100%; max-width:440px; padding:28px; text-align:center; box-shadow:0 14px 40px rgba(0,0,0,.4); }
+  #result-card .rc-grade { display:inline-flex; align-items:center; justify-content:center; min-width:120px; height:120px; padding:0 16px; border-radius:50%; background:#1c1c1c; color:#ffe14d; font-size:44px; font-weight:900; margin-bottom:16px; }
+  #result-card .rc-img { width:240px; height:240px; border-radius:14px; object-fit:contain; background:#f1ecff; font-size:110px; margin:0 auto 14px; }
+  #result-card .rc-name { font-size:34px; font-weight:800; line-height:1.35; }
+  #result-card .rc-ip { font-size:20px; color:#888; margin-top:8px; }
+  #result-card.lastone-extra { border:3px solid #ffce3d; }
+  #result-lastone { background:linear-gradient(135deg,#ffe9a8,#ffce3d); color:#5a4500; border-radius:18px; width:100%; max-width:440px; padding:18px; text-align:center; font-weight:800; font-size:18px; }
+  #result-lastone .rl-name { font-size:24px; margin-top:6px; color:#222; }
+  #result-meta { color:rgba(255,255,255,.92); font-size:20px; text-align:center; }
+  #result-meta b { color:#ffe14d; }
+  #result-hint { font-size:18px; color:rgba(255,255,255,.8); }
+
+  /* S9 관리자 */
+  #scr-admin { background:#15102b; color:#eee; }
+  #scr-admin .topbar { background:#000; }
+  #pin-pad { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+  #pin-pad .pin-dots { font-size:32px; letter-spacing:10px; height:40px; color:#ffe14d; }
+  #pin-grid { display:grid; grid-template-columns:repeat(3,72px); gap:12px; }
+  #pin-grid button { height:72px; border-radius:14px; border:none; background:#2a2152; color:#fff; font-size:24px; font-weight:800; cursor:pointer; }
+  #pin-grid button:active { background:#ffe14d; color:#222; }
+  #admin-body { flex:1; overflow-y:auto; padding:14px; display:none; }
+  #admin-body.show { display:block; }
+  .adm-tabs { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .adm-tabs button { flex:1; min-width:74px; padding:10px 4px; border:none; border-radius:10px; background:#2a2152; color:#bbb; font-weight:700; font-size:13px; cursor:pointer; }
+  .adm-tabs button.active { background:#ffe14d; color:#222; }
+  .adm-pane { display:none; } .adm-pane.show { display:block; }
+  .adm-card { background:#221a45; border-radius:12px; padding:14px; margin-bottom:12px; }
+  .adm-card h4 { font-size:15px; margin-bottom:10px; color:#ffe14d; }
+  .adm-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .adm-row label { font-size:12px; color:#aaa; width:64px; flex-shrink:0; }
+  .adm-row input[type=text], .adm-row input[type=number], .adm-row select { flex:1; min-width:80px; padding:8px; border-radius:8px; border:1px solid #443a6e; background:#15102b; color:#fff; font-family:inherit; font-size:14px; }
+  .adm-row input[type=number]{ max-width:90px; }
+  .adm-btn { padding:9px 14px; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:13px; }
+  .adm-btn.pri { background:#ffe14d; color:#222; } .adm-btn.sec { background:#3a2f6e; color:#fff; } .adm-btn.dng { background:#d32f2f; color:#fff; }
+  .adm-thumb { width:42px; height:42px; border-radius:8px; object-fit:cover; background:#15102b; font-size:20px; display:inline-flex; align-items:center; justify-content:center; }
+  table.adm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+  table.adm-tbl th, table.adm-tbl td { border-bottom:1px solid #332a5e; padding:7px 5px; text-align:left; }
+  table.adm-tbl th { color:#ffe14d; }
+  .prize-edit-row { display:grid; grid-template-columns:46px 56px 1fr 64px 70px 36px; gap:5px; align-items:center; margin-bottom:6px; }
+  .prize-edit-row input, .prize-edit-row select { padding:6px; border-radius:6px; border:1px solid #443a6e; background:#15102b; color:#fff; font-size:12.5px; width:100%; }
+  .prize-edit-row .del { background:#d32f2f; color:#fff; border:none; border-radius:6px; height:32px; cursor:pointer; }
+  .muted-note { font-size:11px; color:#888; margin-top:4px; }
+  .toast { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); background:#000d; color:#fff; padding:10px 20px; border-radius:999px; font-size:14px; z-index:99; opacity:0; transition:opacity .3s; pointer-events:none; }
+  .toast.show { opacity:1; }
+
+  /* ───── 태블릿(세로) 최적화: 화면을 꽉 채우고 콘텐츠를 비례 확대 ───── */
+  @media (min-width:600px){
+    #kiosk { max-width:1100px; }
+    body { font-size:18px; }
+    .btn-yellow { font-size:27px; padding:22px 0; width:66%; }
+    .btn-ghost { font-size:18px; padding:14px 30px; }
+    .topbar { font-size:21px; padding:20px 24px; }
+    .topbar .back { width:54px; height:54px; min-width:54px; font-size:27px; }
+    .topbar .title small { font-size:14px; }
+    .logo-diamond { width:210px; height:210px; }
+    .logo-diamond span { font-size:36px; }
+    .logo-diamond small { font-size:13px; }
+    #scr-idle { gap:54px; }
+    #scr-idle .touch-banner { font-size:25px; padding:20px 48px; }
+    #ip-hero { height:300px; }
+    #ip-hero h1 { font-size:36px; padding:26px; }
+    #ip-list { padding:22px; gap:18px; }
+    .ip-card { height:170px; }
+    .ip-card .ipimg { width:230px; }
+    .ip-card .ipinfo h3 { font-size:26px; }
+    .ip-card .ipinfo .stock { font-size:19px; } .ip-card .ipinfo .stock b { font-size:25px; }
+    #prize-grid { padding:22px; gap:14px; }
+    .prize-cell { padding:16px 20px 16px 14px; gap:20px; }
+    .prize-cell .grade { width:94px; height:94px; font-size:29px; }
+    .prize-cell.lucky .grade { font-size:20px; }
+    .prize-cell .p-img { width:140px; height:140px; }
+    .prize-cell .p-name { font-size:21px; }
+    .prize-cell .p-stock { font-size:15px; } .prize-cell .p-stock b { font-size:21px; }
+    .ticket-gauge i { width:15px; height:19px; }
+    .lineup-footer { padding:18px 0 26px; }
+    .lineup-footer .hint { font-size:16px; margin-bottom:16px; }
+    #draw-box { max-width:560px; padding:40px 32px 44px; gap:26px; }
+    #draw-box .npc-art { width:420px; height:420px; font-size:165px; }
+    #draw-box .draw-msg { font-size:23px; }
+    #reveal-card { width:360px; min-height:470px; padding:30px; gap:20px; }
+    #reveal-card .r-grade { width:116px; height:116px; font-size:40px; }
+    #reveal-card .r-img { width:180px; height:180px; font-size:86px; }
+    #reveal-card .r-name { font-size:23px; }
+    #reveal-sub { font-size:19px; }
+    #scr-result { gap:24px; }
+    #scr-result h2 { font-size:46px; }
+    #result-card { max-width:700px; padding:46px; }
+    #result-card .rc-grade { min-width:190px; height:190px; font-size:66px; margin-bottom:22px; }
+    #result-card .rc-img { width:380px; height:380px; font-size:150px; }
+    #result-card .rc-name { font-size:56px; }
+    #result-card .rc-ip { font-size:34px; }
+    #result-lastone { max-width:700px; font-size:34px; padding:26px; }
+    #result-lastone .rl-name { font-size:42px; }
+    #result-meta { font-size:34px; }
+    #result-hint { font-size:30px; }
+  }
+</style>
+</head>
+<body>
+<div id="kiosk">
+
+  <!-- S1 대기 -->
+  <div class="screen active" id="scr-idle">
+    <video id="idle-video" muted loop playsinline autoplay style="display:none"></video>
+    <div class="bubbles" id="bubbles"></div>
+    <div id="admin-tap"></div>
+    <div class="logo-diamond"><span id="idle-logo">컴투스<br>쿠지<small>EVENT KUJI</small></span></div>
+    <div class="touch-banner" id="idle-banner">화면을 터치하면 시작합니다.</div>
+    <div class="copyright">2026 © Com2uS Popup Event</div>
+  </div>
+
+  <!-- S2 IP 선택 -->
+  <div class="screen" id="scr-ip">
+    <div class="topbar">
+      <button class="back" onclick="go('scr-idle')">←</button>
+      <div class="title">참여할 상품을 선택하세요<small>상품을 터치하면 경품 라인업을 확인할 수 있습니다.</small></div>
+    </div>
+    <div id="ip-hero"><div class="img-fallback">🎁</div><h1 id="ip-hero-title">컴투스 팝업 쿠지</h1></div>
+    <div id="ip-list"></div>
+  </div>
+
+  <!-- S3 경품 라인업 -->
+  <div class="screen" id="scr-lineup">
+    <div class="topbar">
+      <button class="back" onclick="go('scr-ip')">←</button>
+      <div class="title" id="lineup-title"></div>
+    </div>
+    <div id="prize-grid"></div>
+    <div class="lineup-footer">
+      <div class="hint">모두 당첨! 각 등급의 마지막 1개를 뽑으면 행운상(스토어 할인 쿠폰) 추가 🍀</div>
+      <button class="btn btn-yellow" id="draw-start-btn" onclick="startDraw()">뽑기 시작</button>
+    </div>
+  </div>
+
+  <!-- S4 뽑기 -->
+  <div class="screen" id="scr-draw">
+    <div class="topbar">
+      <button class="back" onclick="go('scr-lineup')">←</button>
+      <div class="title" id="draw-ipname"></div>
+    </div>
+    <div id="draw-stage">
+      <div id="draw-box">
+        <div class="npc-art img-fallback" id="draw-npc">🎴</div>
+        <div class="draw-msg">버튼을 누르면 한 장 뽑습니다!</div>
+        <button class="btn btn-yellow" id="draw-go-btn" onclick="pickDraw()">뽑기!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- S5 당첨 연출 -->
+  <div class="screen" id="scr-reveal" onclick="afterReveal()">
+    <div id="reveal-card">
+      <div class="r-grade" id="r-grade">A상</div>
+      <div class="r-img img-fallback" id="r-img">🏆</div>
+      <div class="r-name" id="r-name"></div>
+    </div>
+    <div id="reveal-sub">화면을 터치하면 계속합니다.</div>
+  </div>
+
+  <!-- S6 결과 -->
+  <div class="screen" id="scr-result">
+    <h2>🎉 당첨을 축하합니다!</h2>
+    <div id="result-card">
+      <div class="rc-grade" id="rc-grade">A상</div>
+      <div class="rc-img img-fallback" id="rc-img">🏆</div>
+      <div class="rc-name" id="rc-name"></div>
+      <div class="rc-ip" id="rc-ip"></div>
+    </div>
+    <div id="result-lastone" style="display:none">🍀 행운상 추가 증정! (현장 지급)<div class="rl-name" id="rl-name"></div></div>
+    <div id="result-meta"></div>
+    <div id="result-hint">스태프에게 이 화면을 보여주세요</div>
+    <button class="btn btn-yellow" onclick="resetToIdle()">처음으로</button>
+  </div>
+
+  <!-- S9 관리자 -->
+  <div class="screen" id="scr-admin">
+    <div class="topbar">
+      <button class="back" onclick="resetToIdle()">←</button>
+      <div class="title">관리자 모드</div>
+    </div>
+    <div id="pin-pad">
+      <div>PIN을 입력하세요</div>
+      <div class="pin-dots" id="pin-dots"></div>
+      <div id="pin-grid"></div>
+    </div>
+    <div id="admin-body">
+      <div class="adm-tabs">
+        <button data-pane="ips" class="active" onclick="admTab('ips')">IP·상품</button>
+        <button data-pane="stock" onclick="admTab('stock')">재고</button>
+        <button data-pane="log" onclick="admTab('log')">당첨로그</button>
+        <button data-pane="settings" onclick="admTab('settings')">설정</button>
+      </div>
+      <div class="adm-pane show" id="pane-ips"></div>
+      <div class="adm-pane" id="pane-stock"></div>
+      <div class="adm-pane" id="pane-log"></div>
+      <div class="adm-pane" id="pane-settings"></div>
+    </div>
+  </div>
+
+  <!-- 연출 레이어 -->
+  <div id="fx-flash"></div>
+  <div class="confetti" id="confetti"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ════════════════ 저장소 키 ════════════════ */
+const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1';
+
+/* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
+function defaultConfig(){
+  return {
+    eventName:'컴투스 팝업 쿠지', adminPin:'0000', idleTimeoutSec:30, muted:false, npcs:[],
+    ips:[{
+      id:'ip1', name:'서머너즈 워 컬렉션', heroImageKey:null,
+      lastOne:{ name:'스토어 할인 쿠폰', imageKey:null },
+      prizes:[
+        { grade:'A상', name:'발키리 피규어', imageKey:null, count:2,  tier:'high' },
+        { grade:'B상', name:'이프리트 피규어', imageKey:null, count:3,  tier:'high' },
+        { grade:'C상', name:'빅 쿠션', imageKey:null, count:5,  tier:'high' },
+        { grade:'D상', name:'아크릴 스탠드(랜덤)', imageKey:null, count:10, tier:'normal' },
+        { grade:'E상', name:'스티커 세트', imageKey:null, count:20, tier:'normal' },
+      ],
+    }],
+  };
+}
+
+/* ════════════════ 설정/재고/로그 로드·저장 ════════════════ */
+let cfg = loadCfg(), stock = loadStock(), logArr = loadLog();
+function loadCfg(){ try{ const r=localStorage.getItem(K_CFG); if(r) return JSON.parse(r);}catch(e){} return defaultConfig(); }
+function saveCfg(){ try{ localStorage.setItem(K_CFG, JSON.stringify(cfg)); }catch(e){} }
+function freshStock(){ const s={}; cfg.ips.forEach(ip=> s[ip.id]=ip.prizes.map(p=>+p.count||0)); return s; }
+function loadStock(){
+  try{ const r=localStorage.getItem(K_STOCK); if(r){ const s=JSON.parse(r); return s; } }catch(e){}
+  return freshStock();
+}
+function saveStock(){ try{ localStorage.setItem(K_STOCK, JSON.stringify(stock)); }catch(e){} }
+function loadLog(){ try{ const r=localStorage.getItem(K_LOG); if(r) return JSON.parse(r);}catch(e){} return []; }
+function saveLog(){ try{ localStorage.setItem(K_LOG, JSON.stringify(logArr)); }catch(e){} }
+/* 설정과 재고 정합성 보정 (등급 수가 바뀐 IP는 재고 배열 맞춤) */
+function reconcileStock(){
+  let changed=false;
+  cfg.ips.forEach(ip=>{
+    if(!Array.isArray(stock[ip.id]) || stock[ip.id].length!==ip.prizes.length){
+      stock[ip.id]=ip.prizes.map(p=>+p.count||0); changed=true;
+    }
+  });
+  Object.keys(stock).forEach(id=>{ if(!cfg.ips.find(ip=>ip.id===id)){ delete stock[id]; changed=true; } });
+  if(changed) saveStock();
+}
+function remainOf(ip){ return (stock[ip.id]||[]).reduce((a,b)=>a+b,0); }
+function totalOf(ip){ return ip.prizes.reduce((a,p)=>a+(+p.count||0),0); }
+function totalRemainAll(){ return cfg.ips.reduce((a,ip)=>a+remainOf(ip),0); }
+
+/* ════════════════ IndexedDB 이미지/미디어 저장 ════════════════ */
+let idb=null;
+function openIDB(){ return new Promise((res)=>{ const rq=indexedDB.open('kuji-media',1);
+  rq.onupgradeneeded=()=>{ rq.result.createObjectStore('media'); };
+  rq.onsuccess=()=>{ idb=rq.result; res(idb); }; rq.onerror=()=>res(null); }); }
+function idbPut(key,val){ return new Promise((res)=>{ if(!idb)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
+function idbGet(key){ return new Promise((res)=>{ if(!idb||!key)return res(null); const tx=idb.transaction('media','readonly'); const rq=tx.objectStore('media').get(key); rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>res(null); }); }
+function idbDel(key){ return new Promise((res)=>{ if(!idb||!key)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
+
+/* 이미지 캐시(dataURL) — 부팅 시 config가 참조하는 모든 키 로드 */
+const imgCache={};
+async function loadAllImages(){
+  const keys=new Set();
+  cfg.ips.forEach(ip=>{ if(ip.heroImageKey)keys.add(ip.heroImageKey); if(ip.lastOne&&ip.lastOne.imageKey)keys.add(ip.lastOne.imageKey); ip.prizes.forEach(p=>{ if(p.imageKey)keys.add(p.imageKey); }); });
+  for(const k of keys){ imgCache[k]=await idbGet(k); }
+}
+/* img 또는 fallback 마크업 */
+function imgTag(key, cls, emoji){
+  const src=key?imgCache[key]:null;
+  if(src) return `<img class="${cls}" src="${src}" alt="">`;
+  return `<div class="${cls} img-fallback">${emoji||'🎁'}</div>`;
+}
+
+/* ════════════════ 화면 전환 + 30초 유휴 ════════════════ */
+let currentScreen='scr-idle', idleTimer=null, idleScreens=['scr-ip','scr-lineup','scr-result'];
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentScreen=id;
+  manageIdle();
+}
+function manageIdle(){
+  clearTimeout(idleTimer);
+  if(idleScreens.includes(currentScreen)){
+    idleTimer=setTimeout(resetToIdle, (cfg.idleTimeoutSec||30)*1000);
+  }
+}
+function resetIdle(){ if(idleScreens.includes(currentScreen)) manageIdle(); }
+document.getElementById('kiosk').addEventListener('pointerdown', resetIdle, true);
+
+/* ════════════════ S1 대기 ════════════════ */
+let curIp=null, drawing=false, lastResult=null, lastNpcId=null;
+async function bootIdle(){
+  document.getElementById('idle-logo').innerHTML = `${esc(cfg.eventName||'컴투스 쿠지').replace(/ /g,'<br>')}<small>EVENT KUJI</small>`;
+  // 대기 영상
+  const vid=await idbGet('idle_video'); const v=document.getElementById('idle-video');
+  if(v._ourl){ try{ URL.revokeObjectURL(v._ourl); }catch(e){} v._ourl=null; }
+  if(vid){ try{ const src=(typeof vid==='string')?vid:(v._ourl=URL.createObjectURL(vid)); v.src=src; v.style.display='block'; v.play().catch(()=>{}); }catch(e){ v.style.display='none'; } }
+  else { v.removeAttribute('src'); v.style.display='none'; }
+  refreshIdleSoldout();
+}
+function refreshIdleSoldout(){
+  const sold=totalRemainAll()===0;
+  document.getElementById('scr-idle').classList.toggle('soldout', sold);
+  document.getElementById('idle-banner').textContent = sold ? '금일 이벤트가 종료되었습니다.' : '화면을 터치하면 시작합니다.';
+}
+document.getElementById('scr-idle').addEventListener('click', e=>{
+  if(e.target.id==='admin-tap') return;     // 관리자 진입 영역
+  if(totalRemainAll()===0){ refreshIdleSoldout(); return; }
+  startBgm('select');
+  if(cfg.ips.filter(ip=>remainOf(ip)>0).length===1 && cfg.ips.length===1){ curIp=cfg.ips[0]; renderLineup(); go('scr-lineup'); }
+  else goIp();
+});
+
+/* ════════════════ S2 IP 선택 ════════════════ */
+function goIp(){ renderIp(); go('scr-ip'); }
+async function renderIp(){
+  document.getElementById('ip-hero-title').textContent=cfg.eventName||'';
+  // 히어로 이미지 (첫 IP의 hero 또는 없음)
+  const heroWrap=document.getElementById('ip-hero');
+  heroWrap.querySelector('img,.img-fallback').outerHTML = imgTag(cfg.ips[0]&&cfg.ips[0].heroImageKey, '', '🎁');
+  const list=document.getElementById('ip-list'); list.innerHTML='';
+  cfg.ips.forEach(ip=>{
+    const remain=remainOf(ip), total=totalOf(ip), sold=remain===0;
+    const card=document.createElement('div');
+    card.className='ip-card'+(sold?' soldout':'');
+    card.innerHTML=`
+      <div class="soldout-badge">SOLD OUT</div>
+      ${imgTag(ip.heroImageKey,'ipimg', ip.name.slice(0,2))}
+      <div class="ipinfo">
+        <h3>${esc(ip.name)}</h3>
+        <div class="stock">잔여 <b>${remain}</b> / ${total}</div>
+        <div class="gauge"><i style="width:${total?remain/total*100:0}%"></i></div>
+      </div>`;
+    if(!sold) card.onclick=()=>{ curIp=ip; renderLineup(); go('scr-lineup'); };
+    list.appendChild(card);
+  });
+}
+
+/* ════════════════ S3 경품 라인업 ════════════════ */
+function renderLineup(){
+  const remain=remainOf(curIp), total=totalOf(curIp);
+  document.getElementById('lineup-title').innerHTML=`${esc(curIp.name)} <em>잔여 ${remain}/${total}</em>`;
+  const grid=document.getElementById('prize-grid'); grid.innerHTML='';
+  curIp.prizes.forEach((p,i)=>{
+    const left=stock[curIp.id][i], out=left===0;
+    let g='';
+    const onCount=Math.min(left,10);
+    for(let k=0;k<Math.min(p.count,10);k++) g+=`<i class="${k<onCount?'on':''}"></i>`;
+    const cell=document.createElement('div');
+    cell.className='prize-cell'+(out?' out':'');
+    cell.innerHTML=`
+      <div class="grade">${esc(p.grade)}</div>
+      <div class="out-badge">품절</div>
+      ${imgTag(p.imageKey,'p-img', gradeEmoji(p.tier))}
+      <div class="p-body">
+        <div class="p-name">${esc(p.name)}</div>
+        <div class="p-stock">잔여 <b>${left}</b> / ${p.count}</div>
+        <div class="ticket-gauge">${g}</div>
+      </div>`;
+    grid.appendChild(cell);
+  });
+  // LAST ONE
+  if(curIp.lastOne && curIp.lastOne.name){
+    const lo=document.createElement('div'); lo.className='prize-cell lucky';
+    lo.innerHTML=`<div class="grade">행운상</div>${imgTag(curIp.lastOne.imageKey,'p-img','🍀')}
+      <div class="p-body"><div class="p-name">${esc(curIp.lastOne.name)}</div><div class="p-stock" style="color:#8a6d00">행운상 · 각 등급 마지막 1개</div></div>`;
+    grid.appendChild(lo);
+  }
+  const btn=document.getElementById('draw-start-btn'); btn.disabled = remain===0;
+}
+function gradeEmoji(tier){ return tier==='high'?'🏆':'🎁'; }
+
+/* ════════════════ S4 뽑기 ════════════════ */
+function startDraw(){
+  if(remainOf(curIp)===0) return;
+  drawing=false;
+  startBgm('play');
+  document.getElementById('draw-ipname').textContent=curIp.name;
+  renderDrawBox();
+  go('scr-draw');
+}
+async function renderDrawBox(){
+  const btn=document.getElementById('draw-go-btn'); if(btn) btn.disabled=false;
+  const el=document.getElementById('draw-npc');
+  if(el._ourl){ try{ URL.revokeObjectURL(el._ourl); }catch(e){} el._ourl=null; }
+  const npcs=cfg.npcs||[];
+  if(!npcs.length){ el.innerHTML='🎴'; return; }
+  // 매 뽑기마다 랜덤 — 단, 직전에 나온 NPC는 연속으로 제외
+  let pool=npcs;
+  if(npcs.length>1 && lastNpcId){ const f=npcs.filter(n=>n.id!==lastNpcId); if(f.length) pool=f; }
+  const pick=pool[Math.floor(Math.random()*pool.length)];
+  lastNpcId=pick.id;
+  const blob=await idbGet('npc_'+pick.id);
+  if(!blob){ el.innerHTML='🎴'; return; }
+  const url=(el._ourl=URL.createObjectURL(blob));
+  el.innerHTML = pick.type==='video'
+    ? `<video src="${url}" muted loop playsinline autoplay></video>`
+    : `<img src="${url}" alt="">`;
+}
+/* 추첨 원자 처리 — 단일 버튼, 연타 방지 */
+function pickDraw(){
+  if(drawing) return;
+  drawing=true;
+  const btn=document.getElementById('draw-go-btn'); if(btn) btn.disabled=true;
+  playSfx('pick');
+  // 비복원 추첨 (랜덤·100% 당첨)
+  const arr=stock[curIp.id]; const pool=[];
+  arr.forEach((c,i)=>{ for(let k=0;k<c;k++) pool.push(i); });
+  const idx=pool[Math.floor(Math.random()*pool.length)];
+  arr[idx]--; saveStock();
+  const prize=curIp.prizes[idx];
+  // 행운상: 이 등급의 마지막 1개를 뽑은 경우 (스토어 할인 쿠폰 현장 지급)
+  const isLucky = arr[idx]===0 && !!(curIp.lastOne && curIp.lastOne.name);
+  const serial = nextSerial();
+  logArr.push({ timestamp:new Date().toISOString(), ipId:curIp.id, ipName:curIp.name, grade:prize.grade, prizeName:prize.name, isLastOne:isLucky, luckyGrade:isLucky?prize.grade:'', serial }); saveLog();
+  lastResult={ ip:curIp, prize, isLucky, serial, high:(prize.tier==='high') };
+  setTimeout(()=>showReveal(), 360);
+}
+function nextSerial(){
+  const today=dateKey(new Date());
+  const n=logArr.filter(l=>dateKey(new Date(l.timestamp))===today).length;
+  return n+1;
+}
+function dateKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+/* ════════════════ S5 당첨 연출 ════════════════ */
+function showReveal(){
+  const {prize, high, isLucky}=lastResult;
+  const card=document.getElementById('reveal-card');
+  card.classList.toggle('high', high);
+  document.getElementById('r-grade').textContent=prize.grade;
+  document.getElementById('r-img').outerHTML = imgTag(prize.imageKey,'r-img', gradeEmoji(prize.tier)).replace('class="','id="r-img" class="');
+  document.getElementById('r-name').textContent=prize.name;
+  document.getElementById('reveal-sub').textContent = isLucky ? '🍀 행운상! 스토어 할인 쿠폰도 함께! (터치)' : '화면을 터치하면 계속합니다.';
+  go('scr-reveal');
+  if(high || isLucky) specialFx(); else playSfx('win');
+}
+function afterReveal(){ renderResult(); go('scr-result'); }
+
+/* ════════════════ S6 결과 ════════════════ */
+function renderResult(){
+  const {ip, prize, isLucky, serial}=lastResult;
+  document.getElementById('rc-grade').textContent=prize.grade;
+  document.getElementById('rc-img').outerHTML = imgTag(prize.imageKey,'rc-img', gradeEmoji(prize.tier)).replace('class="','id="rc-img" class="');
+  document.getElementById('rc-name').textContent=prize.name;
+  document.getElementById('rc-ip').textContent=ip.name;
+  const lo=document.getElementById('result-lastone');
+  if(isLucky){ lo.style.display='block'; document.getElementById('rl-name').textContent=ip.lastOne.name; document.getElementById('result-card').classList.add('lastone-extra'); }
+  else { lo.style.display='none'; document.getElementById('result-card').classList.remove('lastone-extra'); }
+  const t=new Date();
+  document.getElementById('result-meta').innerHTML=`당첨 시각 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')} · 일련번호 <b>#${serial}</b>`;
+}
+function resetToIdle(){
+  drawing=false; lastResult=null; curIp=null;
+  refreshIdleSoldout(); startBgm('idle');
+  go('scr-idle');
+}
+
+/* ════════════════ 연출 효과 ════════════════ */
+function specialFx(){
+  const k=document.getElementById('kiosk');
+  const f=document.getElementById('fx-flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+  k.classList.remove('shake'); void k.offsetWidth; k.classList.add('shake');
+  for(let i=0;i<5;i++){ const b=document.createElement('div'); b.className='bolt'; b.style.left=(10+i*20)+'%'; b.style.transform='rotate('+(-12+i*6)+'deg)'; k.appendChild(b); void b.offsetWidth; b.classList.add('go'); setTimeout(()=>b.remove(),700); }
+  fireConfetti(); playSfx('fanfare');
+}
+function fireConfetti(){
+  const wrap=document.getElementById('confetti'); const colors=['#ffe14d','#ff5d8f','#4dd0ff','#b9ff4d','#ff9800'];
+  for(let i=0;i<46;i++){ const c=document.createElement('i'); c.style.left=Math.random()*100+'%'; c.style.background=colors[i%colors.length]; c.style.animationDuration=(1.2+Math.random()*1.5)+'s'; c.style.animationDelay=(Math.random()*.4)+'s'; wrap.appendChild(c); setTimeout(()=>c.remove(),3400); }
+}
+(function makeBubbles(){ const wrap=document.getElementById('bubbles'); for(let i=0;i<14;i++){ const b=document.createElement('i'); const s=14+Math.random()*60; b.style.width=b.style.height=s+'px'; b.style.left=Math.random()*100+'%'; b.style.animationDuration=(7+Math.random()*9)+'s'; b.style.animationDelay=(-Math.random()*10)+'s'; wrap.appendChild(b);} })();
+
+/* ════════════════ 사운드 (효과음=WebAudio 합성, BGM=업로드 파일) ════════════════ */
+let actx=null; function audioCtx(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(freq,dur,type,vol,delay){ const c=audioCtx(); if(!c||cfg.muted)return; const t=c.currentTime+(delay||0); const o=c.createOscillator(),g=c.createGain(); o.type=type||'sine'; o.frequency.value=freq; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.2,t+.01); g.gain.exponentialRampToValueAtTime(.001,t+dur); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur); }
+/* 효과음: 업로드 파일 우선, 없으면 기본 합성음(WebAudio) 폴백 */
+const sfxEl={ pick:new Audio(), win:new Audio(), special:new Audio() }; const sfxUrls={};
+async function loadSfx(){ for(const k of ['pick','win','special']){ const d=await idbGet('sfx_'+k); if(d){ if(sfxUrls[k]){try{URL.revokeObjectURL(sfxUrls[k]);}catch(e){}} sfxEl[k].src=(typeof d==='string')?d:(sfxUrls[k]=URL.createObjectURL(d)); } } }
+function playSfx(kind){
+  if(cfg.muted)return;
+  const slot={pick:'pick',win:'win',fanfare:'special'}[kind];
+  const a=slot&&sfxEl[slot];
+  if(a&&a.src){ try{ a.currentTime=0; a.volume=.8; a.play().catch(()=>{}); return; }catch(e){} }
+  // 폴백: 기본 합성음
+  if(kind==='pick'){ tone(660,.12,'triangle',.18); }
+  else if(kind==='win'){ tone(523,.18,'sine',.2); tone(784,.25,'sine',.18,.12); }
+  else if(kind==='fanfare'){ [523,659,784,1047].forEach((f,i)=>tone(f,.3,'sawtooth',.16,i*.11)); tone(1047,.5,'sine',.14,.5); }
+}
+/* BGM: 화면별 3슬롯 (대기 / 선택 / 뽑기), 루핑 */
+const bgmEl={ idle:new Audio(), select:new Audio(), play:new Audio() }; Object.values(bgmEl).forEach(a=>a.loop=true); let curBgm=null; const bgmUrls={};
+async function loadBgm(){ for(const slot of ['idle','select','play']){ const d=await idbGet('bgm_'+slot); if(d){ if(bgmUrls[slot]){try{URL.revokeObjectURL(bgmUrls[slot]);}catch(e){}} bgmEl[slot].src=(typeof d==='string')?d:(bgmUrls[slot]=URL.createObjectURL(d)); } } }
+function startBgm(slot){ if(curBgm&&curBgm!==slot){ try{bgmEl[curBgm].pause();}catch(e){} } curBgm=slot; if(cfg.muted)return; const a=bgmEl[slot]; if(a&&a.src){ a.volume=.4; a.play().catch(()=>{}); } }
+function applyMute(){ if(cfg.muted){ Object.values(bgmEl).forEach(a=>{try{a.pause();}catch(e){}});} else if(curBgm){ startBgm(curBgm); } }
+
+/* ════════════════ S9 관리자 ════════════════ */
+let tapCount=0, tapTimer=null, pinBuf='';
+document.getElementById('admin-tap').addEventListener('click', ()=>{
+  tapCount++; clearTimeout(tapTimer); tapTimer=setTimeout(()=>tapCount=0,3000);
+  if(tapCount>=5){ tapCount=0; openAdmin(); }
+});
+function openAdmin(){ pinBuf=''; renderPinDots(); document.getElementById('pin-pad').style.display='flex'; document.getElementById('admin-body').classList.remove('show'); go('scr-admin'); }
+function renderPinDots(){ document.getElementById('pin-dots').textContent='●'.repeat(pinBuf.length)+'○'.repeat(Math.max(0,4-pinBuf.length)); }
+(function buildPin(){ const g=document.getElementById('pin-grid'); ['1','2','3','4','5','6','7','8','9','⌫','0','✓'].forEach(k=>{ const b=document.createElement('button'); b.textContent=k; b.onclick=()=>pinKey(k); g.appendChild(b); }); })();
+function pinKey(k){ if(k==='⌫'){ pinBuf=pinBuf.slice(0,-1); } else if(k==='✓'){ checkPin(); return; } else if(pinBuf.length<8){ pinBuf+=k; } renderPinDots(); if(pinBuf.length===String(cfg.adminPin).length) checkPin(); }
+function checkPin(){ if(pinBuf===String(cfg.adminPin)){ document.getElementById('pin-pad').style.display='none'; document.getElementById('admin-body').classList.add('show'); admTab('ips'); } else { toast('PIN이 올바르지 않습니다'); pinBuf=''; renderPinDots(); } }
+function admTab(name){ document.querySelectorAll('.adm-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.pane===name)); document.querySelectorAll('.adm-pane').forEach(p=>p.classList.remove('show')); document.getElementById('pane-'+name).classList.add('show'); if(name==='ips')renderAdmIps(); if(name==='stock')renderAdmStock(); if(name==='log')renderAdmLog(); if(name==='settings')renderAdmSettings(); }
+
+/* IP·상품 편집 */
+function renderAdmIps(){
+  const root=document.getElementById('pane-ips'); root.innerHTML='';
+  cfg.ips.forEach((ip,ii)=>{
+    const card=document.createElement('div'); card.className='adm-card';
+    let prizeRows='';
+    ip.prizes.forEach((p,pi)=>{
+      prizeRows+=`<div class="prize-edit-row">
+        <input value="${escAttr(p.grade)}" onchange="admEditPrize(${ii},${pi},'grade',this.value)" placeholder="등급">
+        <select onchange="admEditPrize(${ii},${pi},'tier',this.value)"><option value="normal"${p.tier!=='high'?' selected':''}>일반</option><option value="high"${p.tier==='high'?' selected':''}>상위</option></select>
+        <input value="${escAttr(p.name)}" onchange="admEditPrize(${ii},${pi},'name',this.value)" placeholder="경품명">
+        <input type="number" min="0" value="${p.count}" onchange="admEditPrize(${ii},${pi},'count',this.value)">
+        <button class="adm-btn sec" onclick="admPickImg(${ii},${pi})">이미지</button>
+        <button class="del" onclick="admDelPrize(${ii},${pi})">×</button>
+      </div>`;
+    });
+    card.innerHTML=`
+      <h4>IP ${ii+1} <button class="adm-btn dng" style="float:right" onclick="admDelIp(${ii})">IP 삭제</button></h4>
+      <div class="adm-row"><label>IP명</label><input value="${escAttr(ip.name)}" onchange="admEditIp(${ii},'name',this.value)"></div>
+      <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
+      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">등급 / 상위·일반 / 경품명 / 수량 / 이미지</div>
+      ${prizeRows}
+      <button class="adm-btn sec" onclick="admAddPrize(${ii})">+ 등급 추가</button>
+      <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button></div>
+      <div class="muted-note">행운상: 각 등급의 마지막 1개를 뽑은 참여자에게 현장 지급</div>`;
+    root.appendChild(card);
+  });
+  const add=document.createElement('button'); add.className='adm-btn pri'; add.style.width='100%'; add.textContent='+ IP 추가 (최대 3개)';
+  add.onclick=admAddIp; if(cfg.ips.length>=3) add.disabled=true; root.appendChild(add);
+  const save=document.createElement('button'); save.className='adm-btn pri'; save.style.cssText='width:100%;margin-top:10px;padding:14px'; save.textContent='💾 저장 (재고 초기화 확인)'; save.onclick=admSaveCfg; root.appendChild(save);
+}
+function admEditIp(i,f,v){ cfg.ips[i][f]=v; }
+function admEditPrize(i,pi,f,v){ cfg.ips[i].prizes[pi][f] = f==='count'? (Math.max(0,parseInt(v)||0)) : v; }
+function admEditLastOne(i,v){ if(!cfg.ips[i].lastOne) cfg.ips[i].lastOne={name:'',imageKey:null}; cfg.ips[i].lastOne.name=v; }
+function admAddPrize(i){ cfg.ips[i].prizes.push({grade:'',name:'',imageKey:null,count:1,tier:'normal'}); renderAdmIps(); }
+function admDelPrize(i,pi){ cfg.ips[i].prizes.splice(pi,1); renderAdmIps(); }
+function admAddIp(){ if(cfg.ips.length>=3)return; cfg.ips.push({id:'ip'+Date.now(),name:'새 IP',heroImageKey:null,lastOne:{name:'',imageKey:null},prizes:[{grade:'A상',name:'',imageKey:null,count:1,tier:'high'}]}); renderAdmIps(); }
+function admDelIp(i){ if(cfg.ips.length<=1){toast('최소 1개 IP가 필요합니다');return;} if(confirm('이 IP를 삭제할까요?')){ cfg.ips.splice(i,1); renderAdmIps(); } }
+/* 이미지 업로드 */
+function pickFile(accept){ return new Promise(res=>{ const inp=document.createElement('input'); inp.type='file'; inp.accept=accept; inp.onchange=()=>res(inp.files[0]||null); inp.click(); }); }
+function fileToDataURL(f){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>res(null); r.readAsDataURL(f); }); }
+async function uploadImg(key){ const f=await pickFile('image/*'); if(!f)return null; if(f.size>1.5*1024*1024){ toast('이미지는 1.5MB 이하 권장'); } const d=await fileToDataURL(f); if(!d)return null; await idbPut(key,d); imgCache[key]=d; return key; }
+async function admPickImg(i,pi){ const key='img_'+cfg.ips[i].id+'_p'+pi+'_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].prizes[pi].imageKey=k; toast('이미지 적용됨 (저장 잊지 마세요)'); renderAdmIps(); } }
+async function admPickHero(i){ const key='img_'+cfg.ips[i].id+'_hero_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].heroImageKey=k; renderAdmIps(); } }
+async function admPickLastOne(i){ if(!cfg.ips[i].lastOne)cfg.ips[i].lastOne={name:'',imageKey:null}; const key='img_'+cfg.ips[i].id+'_lo_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].lastOne.imageKey=k; renderAdmIps(); } }
+function admSaveCfg(){
+  // 빈 등급 정리
+  cfg.ips.forEach(ip=>{ ip.prizes=ip.prizes.filter(p=>p.grade||p.name); });
+  saveCfg();
+  if(confirm('설정을 저장했습니다.\n수량이 바뀌었다면 재고를 초기화해야 정확합니다.\n지금 재고를 초기화할까요? (당첨 로그는 유지)')){
+    stock=freshStock(); saveStock();
+  } else { reconcileStock(); }
+  toast('저장 완료'); renderAdmIps();
+}
+
+/* 재고 현황 */
+function renderAdmStock(){
+  const root=document.getElementById('pane-stock'); let html=`<div class="adm-card"><h4>전체 잔여: ${totalRemainAll()}장</h4>`;
+  cfg.ips.forEach(ip=>{
+    html+=`<div style="margin:10px 0 4px;font-weight:700">${esc(ip.name)} — 잔여 ${remainOf(ip)}/${totalOf(ip)}</div><table class="adm-tbl"><tr><th>등급</th><th>경품</th><th>잔여/초기</th></tr>`;
+    ip.prizes.forEach((p,i)=>{ html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}</td><td>${stock[ip.id]?stock[ip.id][i]:0} / ${p.count}</td></tr>`; });
+    html+=`</table>`;
+  });
+  html+=`</div><button class="adm-btn dng" style="width:100%;padding:14px" onclick="admResetStock()">⚠️ 재고 전체 리셋</button>`;
+  root.innerHTML=html;
+}
+function admResetStock(){ if(confirm('재고를 초기 수량으로 되돌릴까요?')){ if(confirm('정말 초기화하시겠습니까? (되돌릴 수 없음)')){ stock=freshStock(); saveStock(); toast('재고 초기화 완료'); renderAdmStock(); } } }
+
+/* 당첨 로그 + CSV */
+function renderAdmLog(){
+  const root=document.getElementById('pane-log');
+  const today=dateKey(new Date()); const todayCnt=logArr.filter(l=>dateKey(new Date(l.timestamp))===today).length;
+  let html=`<div class="adm-card"><h4>당첨 로그 (총 ${logArr.length}건 · 오늘 ${todayCnt}건)</h4>
+    <button class="adm-btn pri" onclick="exportCsv()">📄 CSV 내보내기</button>
+    <button class="adm-btn dng" style="float:right" onclick="admClearLog()">로그 삭제</button>
+    <table class="adm-tbl" style="margin-top:10px"><tr><th>#</th><th>시각</th><th>IP</th><th>등급</th><th>경품</th></tr>`;
+  logArr.slice(-50).reverse().forEach(l=>{ const t=new Date(l.timestamp); html+=`<tr><td>${l.serial||''}</td><td>${String(t.getMonth()+1).padStart(2,'0')}/${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</td><td>${esc(l.ipName)}</td><td>${esc(l.grade)}${l.isLastOne?' +LO':''}</td><td>${esc(l.prizeName)}</td></tr>`; });
+  html+=`</table><div class="muted-note">최근 50건 표시 · CSV는 전체</div></div>`;
+  root.innerHTML=html;
+}
+function exportCsv(){
+  const rows=[['serial','timestamp','ipId','ipName','grade','prizeName','isLastOne']];
+  logArr.forEach(l=>rows.push([l.serial||'',l.timestamp,l.ipId,l.ipName,l.grade,l.prizeName,l.isLastOne?'TRUE':'FALSE']));
+  const csv='﻿'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`kuji-log-${dateKey(new Date()).replace(/-/g,'')}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('CSV 다운로드');
+}
+function admClearLog(){ if(confirm('당첨 로그를 모두 삭제할까요? (CSV 백업 권장)')){ logArr=[]; saveLog(); toast('로그 삭제됨'); renderAdmLog(); } }
+
+/* 설정 */
+function renderAdmSettings(){
+  const root=document.getElementById('pane-settings');
+  const npcRows=(cfg.npcs||[]).map((n,i)=>`<div class="adm-row"><label>NPC ${i+1}</label><span style="flex:1">${n.type==='video'?'🎬 영상':'🖼 이미지'}</span><button class="adm-btn dng" onclick="delNpc('${n.id}')">삭제</button></div>`).join('') || '<div class="muted-note">등록된 NPC 없음 (없으면 기본 🎴 표시)</div>';
+  root.innerHTML=`<div class="adm-card"><h4>기본 설정</h4>
+    <div class="adm-row"><label>이벤트명</label><input id="set-name" value="${escAttr(cfg.eventName)}"></div>
+    <div class="adm-row"><label>PIN</label><input id="set-pin" value="${escAttr(cfg.adminPin)}"></div>
+    <div class="adm-row"><label>유휴(초)</label><input id="set-idle" type="number" min="10" value="${cfg.idleTimeoutSec}"></div>
+    <div class="adm-row"><label>음소거</label><button class="adm-btn ${cfg.muted?'dng':'sec'}" onclick="toggleMute()">${cfg.muted?'🔇 음소거 ON':'🔊 소리 ON'}</button></div>
+    <button class="adm-btn pri" style="width:100%;margin-top:8px" onclick="saveSettings()">설정 저장</button>
+  </div>
+  <div class="adm-card"><h4>대기 영상</h4>
+    <div class="adm-row"><label>대기영상</label><button class="adm-btn sec" onclick="uploadMedia('idle_video','video/*')">영상 업로드</button><button class="adm-btn dng" onclick="delMedia('idle_video')">삭제</button></div>
+    <div class="muted-note">세로 MP4, 무음, 최대 150MB (빠른 로딩엔 50MB↓ 권장)</div>
+  </div>
+  <div class="adm-card"><h4>뽑기 NPC (여러 개 = 랜덤 표시)</h4>
+    ${npcRows}
+    <div class="adm-row" style="margin-top:8px"><button class="adm-btn sec" onclick="addNpc('image/*','image')">+ 이미지 추가</button><button class="adm-btn sec" onclick="addNpc('video/*','video')">+ 영상 추가</button></div>
+    <div class="muted-note">뽑기 화면마다 랜덤으로 하나 표시 · 영상은 무음 루핑 · 이미지 8MB / 영상 60MB</div>
+  </div>
+  <div class="adm-card"><h4>배경음악 (BGM · 화면별 루핑)</h4>
+    <div class="adm-row"><label>대기</label><button class="adm-btn sec" onclick="uploadMedia('bgm_idle','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('bgm_idle')">삭제</button></div>
+    <div class="adm-row"><label>선택</label><button class="adm-btn sec" onclick="uploadMedia('bgm_select','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('bgm_select')">삭제</button></div>
+    <div class="adm-row"><label>뽑기</label><button class="adm-btn sec" onclick="uploadMedia('bgm_play','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('bgm_play')">삭제</button></div>
+    <div class="muted-note">대기 / IP·라인업(선택) / 뽑기·연출·결과 화면별로 자동 전환·루핑 · mp3/m4a/wav, 최대 30MB</div>
+  </div>
+  <div class="adm-card"><h4>효과음 (미설정 시 기본음)</h4>
+    <div class="adm-row"><label>뽑기음</label><button class="adm-btn sec" onclick="uploadMedia('sfx_pick','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('sfx_pick')">삭제</button></div>
+    <div class="adm-row"><label>일반당첨</label><button class="adm-btn sec" onclick="uploadMedia('sfx_win','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('sfx_win')">삭제</button></div>
+    <div class="adm-row"><label>스페셜</label><button class="adm-btn sec" onclick="uploadMedia('sfx_special','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('sfx_special')">삭제</button></div>
+    <div class="muted-note">스페셜 = A·B·C·행운상 당첨 시 금빛 번개 사운드. 업로드 안 하면 기본 합성음 사용</div>
+  </div>`;
+}
+function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); saveCfg(); bootIdle(); toast('설정 저장됨'); }
+function toggleMute(){ cfg.muted=!cfg.muted; saveCfg(); applyMute(); renderAdmSettings(); }
+async function uploadMedia(key,accept){
+  const f=await pickFile(accept); if(!f)return;
+  const isVid = key==='idle_video';
+  const isAudio = key.startsWith('bgm_') || key.startsWith('sfx_');
+  const cap = isVid?150:(isAudio?30:8);
+  if(f.size>cap*1024*1024){ toast(`${cap}MB 이하만 가능`); return; }
+  if(isVid || isAudio){ // 대용량 → Blob 원본 저장
+    await idbPut(key, f);
+    if(isVid) await bootIdle();
+    else if(key.startsWith('bgm_')) await loadBgm();
+    else await loadSfx();
+    toast('업로드 완료'); return;
+  }
+  const d=await fileToDataURL(f); if(!d)return; await idbPut(key,d); // 이미지 등은 dataURL
+  toast('업로드 완료');
+}
+async function delMedia(key){ await idbDel(key); if(key.startsWith('bgm_')){ const slot=key.slice(4); bgmEl[slot]&&(bgmEl[slot].src=''); } else if(key.startsWith('sfx_')){ const slot=key.slice(4); sfxEl[slot]&&(sfxEl[slot].src=''); } else if(key==='idle_video'){ await bootIdle(); } toast('삭제됨'); }
+/* 뽑기 NPC (이미지/영상 여러 개 → 랜덤 표시) */
+async function addNpc(accept,type){
+  const f=await pickFile(accept); if(!f)return;
+  const cap=type==='video'?60:8;
+  if(f.size>cap*1024*1024){ toast(`${cap}MB 이하만 가능`); return; }
+  const id='n'+Date.now()+Math.floor(Math.random()*1000);
+  await idbPut('npc_'+id, f);
+  if(!Array.isArray(cfg.npcs)) cfg.npcs=[];
+  cfg.npcs.push({id,type}); saveCfg();
+  toast('NPC 추가됨'); renderAdmSettings();
+}
+async function delNpc(id){ await idbDel('npc_'+id); cfg.npcs=(cfg.npcs||[]).filter(n=>n.id!==id); saveCfg(); toast('삭제됨'); renderAdmSettings(); }
+
+/* ════════════════ 유틸 ════════════════ */
+function dataURLtoBlob(d){ try{ const [h,b]=d.split(','); const mime=(h.match(/:(.*?);/)||[])[1]||'image/png'; const bin=atob(b); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return new Blob([u],{type:mime}); }catch(e){ return null; } }
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escAttr(s){ return String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+let toastTimer=null; function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1800); }
+
+/* 화면 줌/제스처 방지 */
+document.addEventListener('gesturestart',e=>e.preventDefault());
+document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+
+/* ════════════════ 부팅 ════════════════ */
+(async function boot(){
+  await openIDB();
+  reconcileStock();
+  // npcs 배열 보정 + 기존 단일 NPC(draw_npc) 자동 이전
+  if(!Array.isArray(cfg.npcs)) cfg.npcs=[];
+  try{
+    if(cfg.npcs.length===0){
+      const old=await idbGet('draw_npc');
+      if(old){ const id='n'+Date.now(); const blob=(typeof old==='string')?dataURLtoBlob(old):old;
+        if(blob){ await idbPut('npc_'+id,blob); cfg.npcs.push({id,type:'image'}); saveCfg(); await idbDel('draw_npc'); } }
+    }
+  }catch(e){}
+  await loadAllImages();
+  await loadBgm();
+  await loadSfx();
+  await bootIdle();
+  applyMute();
+  // 서비스워커: 실제 배포(HTTPS 도메인)에서만 캐싱. localhost 개발 중에는 끄고 항상 최신 파일 사용.
+  const isLocal = ['localhost','127.0.0.1','::1',''].includes(location.hostname);
+  if('serviceWorker' in navigator){
+    if(isLocal){
+      try{
+        const regs = await navigator.serviceWorker.getRegistrations();
+        if(regs.length){
+          await Promise.all(regs.map(r=>r.unregister()));
+          if(window.caches){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+          location.reload(); return;
+        }
+      }catch(e){}
+    } else {
+      try{ navigator.serviceWorker.register('sw.js'); }catch(e){}
+    }
+  }
+})();
+</script>
+</body>
+</html>
