@@ -5,3 +5,10 @@
 
 # 원본 소스 자료(BGM 라이브러리·프로모션 등) — 앱 산출물 아님, 저장소 제외
 Resource/
+
+# 디자인 시스템 원본 소스(Claude Design 산출물, 66MB) — 앱이 쓰는 폰트·로고는 kuji-app/assets/로 복사됨
+/Lucky Draw Event Design System/
+Lucky Draw Event Design System.zip
+
+# 백업 파일(커밋 이력이 곧 백업)
+*.bak

@@ -1,13 +1,22 @@
 /* 컴투스 팝업 쿠지 — Service Worker
    앱 자산을 사전 캐싱해 오프라인에서도 동작하게 한다.
    ※ 앱을 수정·재배포할 때는 CACHE 버전을 올려야 태블릿이 새 버전을 받는다. */
-const CACHE = 'kuji-v1';
+const CACHE = 'kuji-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './assets/icon-192.png',
-  './assets/icon-512.png'
+  './assets/icon-512.png',
+  './assets/com2us-store-logo-white.svg',
+  './assets/com2us-store-lockup-white.svg',
+  './assets/fonts/Pretendard-Light.otf',
+  './assets/fonts/Pretendard-Regular.otf',
+  './assets/fonts/Pretendard-Medium.otf',
+  './assets/fonts/Pretendard-SemiBold.otf',
+  './assets/fonts/Pretendard-Bold.otf',
+  './assets/fonts/Pretendard-ExtraBold.otf',
+  './assets/fonts/Pretendard-Black.otf'
 ];
 
 self.addEventListener('install', e => {
