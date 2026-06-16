@@ -225,12 +225,12 @@
   /* S4 뽑기 — 중앙 네온 프레임 박스 + NPC */
   #scr-draw { color:#fff; }
   #draw-stage { flex:1; display:flex; align-items:center; justify-content:center; padding:20px; }
-  #draw-box { position:relative; width:100%; max-width:380px; background:linear-gradient(120deg,#2A1860,#160A33); border:2px solid var(--purple-400); border-radius:var(--r-xl); padding:24px 22px 28px; text-align:center; box-shadow:var(--glow-purple); display:flex; flex-direction:column; align-items:center; gap:18px; animation:cardIn .5s cubic-bezier(.2,1.5,.4,1); }
-  #draw-box::before,#draw-box::after { content:"✦"; position:absolute; top:12px; color:rgba(255,255,255,.8); font-size:16px; text-shadow:0 0 8px rgba(255,255,255,.6); animation:ld-twinkle2 2.2s ease-in-out infinite; }
-  #draw-box::before { left:14px } #draw-box::after { right:14px; animation-delay:.7s }
+  #draw-box { position:relative; width:100%; max-width:380px; padding:8px 22px 28px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:20px; animation:cardIn .5s cubic-bezier(.2,1.5,.4,1); }
   @keyframes ld-twinkle2 { 0%,100%{opacity:.35;transform:scale(.8) rotate(0)} 50%{opacity:1;transform:scale(1.15) rotate(45deg)} }
-  #draw-box .npc-art { width:285px; height:285px; border-radius:var(--r-lg); overflow:hidden; font-size:108px; display:flex; align-items:center; justify-content:center; }
-  #draw-box .npc-art img, #draw-box .npc-art video { width:100%; height:100%; object-fit:cover; border-radius:inherit; display:block; }
+  #draw-box .npc-art { position:relative; width:285px; aspect-ratio:578/615; }
+  #draw-box .npc-art .npc-media { position:absolute; inset:6.5%; border-radius:18px; overflow:hidden; font-size:108px; display:flex; align-items:center; justify-content:center; background:#160A33; }
+  #draw-box .npc-art .npc-media>img, #draw-box .npc-art .npc-media>video { width:100%; height:100%; object-fit:cover; display:block; }
+  #draw-box .npc-art .npc-frame { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
   #draw-box .draw-msg { font-size:17px; font-weight:700; color:#fff; }
   #ticket-box { flex:1; width:100%; display:flex; flex-wrap:wrap; gap:14px; align-content:center; justify-content:center; padding:16px 28px; }
   .ticket { width:66px; height:90px; border-radius:var(--r-sm); cursor:pointer; background:linear-gradient(180deg,#FDF6E3,#F5E6BD); border:2px dashed var(--gold-700); display:flex; align-items:center; justify-content:center; font-size:26px; color:var(--gold-700); font-weight:900; box-shadow:0 4px 10px rgba(0,0,0,.35); transition:transform .15s; animation:wobble 2.4s ease-in-out infinite; }
@@ -243,12 +243,13 @@
 
   /* S5 당첨 연출 */
   #scr-reveal { justify-content:center; align-items:center; gap:10px; color:#fff; }
-  #reveal-card { position:relative; width:330px; aspect-ratio:1/1; background:url("assets/frames/frame-purple.png") center/contain no-repeat; animation:cardIn .55s cubic-bezier(.2,1.6,.4,1); }
-  #reveal-card.gold { background-image:url("assets/frames/frame-gold.png"); }
+  #reveal-card { position:relative; width:min(66vw,43vh); aspect-ratio:1200/1600; container-type:inline-size; animation:cardIn .55s cubic-bezier(.2,1.6,.4,1); filter:drop-shadow(0 8px 24px rgba(0,0,0,.55)); }
   @keyframes cardIn { from{transform:scale(.2) rotate(-12deg);opacity:0} to{transform:none;opacity:1} }
-  #reveal-card .r-grade { position:absolute; top:1%; left:50%; transform:translateX(-50%); width:23%; height:23%; z-index:2; }
-  #reveal-card .r-img { position:absolute; left:50%; top:34%; transform:translate(-50%,-50%); width:46%; height:42%; object-fit:contain; background:transparent; font-size:54px; color:#fff; }
-  #reveal-card .r-name { position:absolute; left:50%; top:76%; transform:translate(-50%,-50%); width:78%; text-align:center; font-size:17px; font-weight:800; line-height:1.3; word-break:keep-all; color:#fff; }
+  #reveal-card .r-img { position:absolute; left:50%; top:38.6%; transform:translate(-50%,-50%); width:79%; height:61%; border-radius:10px; overflow:hidden; background:transparent; font-size:24cqw; color:#fff; display:flex; align-items:center; justify-content:center; z-index:1; }
+  #reveal-card .r-img>img { width:100%; height:100%; object-fit:cover; display:block; }
+  #reveal-card .r-frame { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
+  #reveal-card .r-grade { position:absolute; top:-7%; left:50%; transform:translateX(-50%); width:30%; aspect-ratio:1/1; z-index:3; filter:drop-shadow(0 3px 7px rgba(0,0,0,.55)); }
+  #reveal-card .r-name { position:absolute; left:50%; top:84%; transform:translate(-50%,-50%); width:82%; text-align:center; font-size:6.2cqw; font-weight:900; line-height:1.12; word-break:keep-all; color:#FFE08A; text-shadow:0 2px 4px rgba(0,0,0,.95),0 0 3px rgba(0,0,0,.8); z-index:3; }
   #reveal-sub { font-size:14px; opacity:.9; margin-top:8px; }
   /* 번개 이펙트 */
   #fx-flash { position:absolute; inset:0; background:radial-gradient(circle,#FFF8D0,#FFD14A 60%,transparent); opacity:0; pointer-events:none; z-index:30; }
@@ -264,19 +265,23 @@
   @keyframes drop { to{transform:translateY(110vh) rotate(720deg)} }
 
   /* S6 결과 (스태프 제시) */
-  #scr-result { color:#fff; justify-content:center; align-items:center; gap:16px; padding:20px; overflow-y:auto; }
-  #scr-result h2 { font-size:30px; font-weight:900; letter-spacing:-.02em; }
-  #result-card { background:#fff; color:var(--text-strong); border-radius:var(--r-xl); width:100%; max-width:440px; padding:28px; text-align:center; box-shadow:var(--shadow-pop); }
-  #result-card .rc-grade { width:130px; height:130px; margin:0 auto 14px; }
-  #result-card .rc-img { width:240px; height:240px; border-radius:var(--r-md); object-fit:contain; background:var(--prize-well); font-size:110px; margin:0 auto 14px; }
-  #result-card .rc-name { font-size:34px; font-weight:800; line-height:1.35; word-break:keep-all; }
-  #result-card .rc-ip { font-size:20px; color:var(--text-muted); margin-top:8px; }
-  #result-card.lastone-extra { box-shadow:var(--shadow-pop),0 0 0 3px var(--gold-400); }
-  #result-lastone { background:var(--grad-lucky); color:var(--gold-ink); border-radius:var(--r-lg); width:100%; max-width:440px; padding:18px; text-align:center; font-weight:800; font-size:18px; box-shadow:var(--glow-gold-sm); }
+  #scr-result { --cw:min(92vw,33vh); color:#fff; justify-content:center; align-items:center; gap:18px; padding:10px; overflow-y:auto; }
+  #scr-result h2 { font-size:78px; font-weight:900; letter-spacing:-.02em; line-height:1.05; text-align:center; width:100%; word-break:keep-all; }
+  #result-card { position:relative; width:var(--cw); margin-top:3.5vh; aspect-ratio:1200/1600; container-type:inline-size; filter:drop-shadow(0 8px 24px rgba(0,0,0,.55)); }
+  #result-card .rc-img { position:absolute; left:50%; top:38.6%; transform:translate(-50%,-50%); width:79%; height:61%; border-radius:10px; overflow:hidden; background:transparent; font-size:24cqw; color:#fff; display:flex; align-items:center; justify-content:center; z-index:1; }
+  #result-card .rc-img>img { width:100%; height:100%; object-fit:cover; display:block; }
+  #result-card .rc-frame { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
+  #result-card .rc-grade { position:absolute; top:-7%; left:50%; transform:translateX(-50%); width:30%; aspect-ratio:1/1; z-index:3; filter:drop-shadow(0 3px 7px rgba(0,0,0,.55)); }
+  #result-card .rc-name { position:absolute; left:50%; top:84%; transform:translate(-50%,-50%); width:82%; text-align:center; font-size:6.2cqw; font-weight:900; line-height:1.12; word-break:keep-all; color:#FFE08A; text-shadow:0 2px 4px rgba(0,0,0,.95),0 0 3px rgba(0,0,0,.8); z-index:3; }
+  #result-card .rc-ip { display:none; }
+  #result-card.lastone-extra { filter:drop-shadow(0 0 16px var(--gold-400)) drop-shadow(0 8px 24px rgba(0,0,0,.5)); }
+  #result-lastone { background:var(--grad-lucky); color:var(--gold-ink); border-radius:var(--r-lg); width:var(--cw); padding:16px; text-align:center; font-weight:800; font-size:17px; box-shadow:var(--glow-gold-sm); }
   #result-lastone .rl-name { font-size:24px; margin-top:6px; color:var(--text-strong); }
-  #result-meta { color:rgba(255,255,255,.92); font-size:20px; text-align:center; }
+  #result-meta { color:rgba(255,255,255,.92); font-size:14px; text-align:center; white-space:nowrap; }
   #result-meta b { color:var(--gold-400); }
   #result-hint { font-size:18px; color:rgba(255,255,255,.8); }
+  #result-infobox { width:var(--cw); display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; word-break:keep-all; overflow-wrap:break-word; }
+  #scr-result .btn-yellow { width:var(--cw); margin-top:16px; }
 
   /* S9 관리자 — 차분한 다크 퍼플 크롬 */
   #scr-admin { background:var(--purple-950); color:#eee; }
@@ -348,23 +353,17 @@
     .lineup-footer { padding:18px 0 26px; }
     .lineup-footer .hint { font-size:16px; margin-bottom:16px; }
     #draw-box { max-width:560px; padding:40px 32px 44px; gap:26px; }
-    #draw-box .npc-art { width:420px; height:420px; font-size:165px; }
+    #draw-box .npc-art { width:380px; }
+    #draw-box .npc-art .npc-media { font-size:165px; }
     #draw-box .draw-msg { font-size:23px; }
-    #reveal-card { width:520px; }
-    #reveal-card .r-img { font-size:90px; }
-    #reveal-card .r-name { font-size:24px; }
     #reveal-sub { font-size:19px; }
-    #scr-result { gap:24px; }
-    #scr-result h2 { font-size:46px; }
-    #result-card { max-width:700px; padding:46px; }
-    #result-card .rc-grade { width:200px; height:200px; margin:0 auto 20px; }
-    #result-card .rc-img { width:380px; height:380px; font-size:150px; }
-    #result-card .rc-name { font-size:56px; }
-    #result-card .rc-ip { font-size:34px; }
-    #result-lastone { max-width:700px; font-size:34px; padding:26px; }
-    #result-lastone .rl-name { font-size:42px; }
-    #result-meta { font-size:34px; }
-    #result-hint { font-size:30px; }
+    #scr-result { gap:18px; }
+    #scr-result h2 { font-size:96px; }
+    #result-lastone { font-size:19px; padding:12px; }
+    #result-lastone .rl-name { font-size:26px; }
+    #result-meta { font-size:16px; }
+    #result-hint { font-size:16px; }
+    #scr-result .btn-yellow { margin-top:28px; }
   }
 </style>
 </head>
@@ -430,7 +429,10 @@
     </div>
     <div id="draw-stage">
       <div id="draw-box">
-        <div class="npc-art img-fallback" id="draw-npc">🎴</div>
+        <div class="npc-art">
+          <div class="npc-media img-fallback" id="draw-npc">🎴</div>
+          <img class="npc-frame" src="assets/frames/frame-normal.png" alt="">
+        </div>
         <div class="draw-msg">버튼을 누르면 한 장 뽑습니다!</div>
         <button class="btn btn-yellow" id="draw-go-btn" onclick="pickDraw()">뽑기!</button>
       </div>
@@ -440,8 +442,9 @@
   <!-- S5 당첨 연출 -->
   <div class="screen" id="scr-reveal" onclick="afterReveal()">
     <div id="reveal-card">
-      <div class="r-grade" id="r-grade">A상</div>
       <div class="r-img img-fallback" id="r-img">🏆</div>
+      <img class="r-frame" id="r-frame" src="assets/frames/frame-purple-card.png" alt="">
+      <div class="r-grade" id="r-grade">A상</div>
       <div class="r-name" id="r-name"></div>
     </div>
     <div id="reveal-sub">화면을 터치하면 계속합니다.</div>
@@ -451,14 +454,17 @@
   <div class="screen" id="scr-result">
     <h2>🎉 당첨을 축하합니다!</h2>
     <div id="result-card">
-      <div class="rc-grade" id="rc-grade">A상</div>
       <div class="rc-img img-fallback" id="rc-img">🏆</div>
+      <img class="rc-frame" id="rc-frame" src="assets/frames/frame-purple-card.png" alt="">
+      <div class="rc-grade" id="rc-grade">A상</div>
       <div class="rc-name" id="rc-name"></div>
       <div class="rc-ip" id="rc-ip"></div>
     </div>
     <div id="result-lastone" style="display:none">🍀 행운상 추가 증정! (현장 지급)<div class="rl-name" id="rl-name"></div></div>
-    <div id="result-meta"></div>
-    <div id="result-hint">스태프에게 이 화면을 보여주세요</div>
+    <div id="result-infobox">
+      <div id="result-meta"></div>
+      <div id="result-hint">스태프에게 이 화면을 보여주세요</div>
+    </div>
     <button class="btn btn-yellow" onclick="resetToIdle()">처음으로</button>
   </div>
 
@@ -741,6 +747,7 @@ function showReveal(){
   const {prize, high, isLucky}=lastResult;
   const card=document.getElementById('reveal-card');
   card.classList.toggle('gold', high);  /* A·B·C·스페셜(상위) = 골드 프레임, 그 외 = 퍼플 */
+  document.getElementById('r-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png';
   const rg=document.getElementById('r-grade'); rg.textContent=prize.grade; rg.dataset.tone=gradeTone(prize.grade);
   document.getElementById('r-img').outerHTML = imgTag(prize.imageKey,'r-img', gradeEmoji(prize.tier)).replace('class="','id="r-img" class="');
   document.getElementById('r-name').textContent=prize.name;
@@ -752,7 +759,8 @@ function afterReveal(){ renderResult(); go('scr-result'); }
 
 /* ════════════════ S6 결과 ════════════════ */
 function renderResult(){
-  const {ip, prize, isLucky, serial}=lastResult;
+  const {ip, prize, isLucky, serial, high}=lastResult;
+  document.getElementById('rc-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png';
   const rcg=document.getElementById('rc-grade'); rcg.textContent=prize.grade; rcg.dataset.tone=gradeTone(prize.grade);
   document.getElementById('rc-img').outerHTML = imgTag(prize.imageKey,'rc-img', gradeEmoji(prize.tier)).replace('class="','id="rc-img" class="');
   document.getElementById('rc-name').textContent=prize.name;
@@ -761,7 +769,7 @@ function renderResult(){
   if(isLucky){ lo.style.display='block'; document.getElementById('rl-name').textContent=ip.lastOne.name; document.getElementById('result-card').classList.add('lastone-extra'); }
   else { lo.style.display='none'; document.getElementById('result-card').classList.remove('lastone-extra'); }
   const t=new Date();
-  document.getElementById('result-meta').innerHTML=`당첨 시각 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')} · 일련번호 <b>#${serial}</b>`;
+  document.getElementById('result-meta').innerHTML=`${esc(ip.name)} / ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')} / 일련번호 <b>#${serial}</b>`;
 }
 function resetToIdle(){
   drawing=false; lastResult=null; curIp=null;

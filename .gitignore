@@ -24,3 +24,6 @@ Lucky Draw Event Design System.zip
 
 # 압축 원본(대용량)
 *.zip
+
+# headless capture (dev only)
+kuji-app/__cap*
