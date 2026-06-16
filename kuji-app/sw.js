@@ -16,7 +16,11 @@ const ASSETS = [
   './assets/fonts/Pretendard-SemiBold.otf',
   './assets/fonts/Pretendard-Bold.otf',
   './assets/fonts/Pretendard-ExtraBold.otf',
-  './assets/fonts/Pretendard-Black.otf'
+  './assets/fonts/Pretendard-Black.otf',
+  './assets/fonts/Gyoza-Black.otf',
+  './assets/fonts/CookieRun-Regular.ttf',
+  './assets/fonts/CookieRun-Bold.ttf',
+  './assets/fonts/CookieRun-Black.ttf'
 ];
 
 self.addEventListener('install', e => {

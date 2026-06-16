@@ -18,6 +18,12 @@
   @font-face{font-family:"Pretendard";font-weight:700;font-display:swap;src:local("Pretendard Bold"),url("assets/fonts/Pretendard-Bold.otf") format("opentype")}
   @font-face{font-family:"Pretendard";font-weight:800;font-display:swap;src:local("Pretendard ExtraBold"),url("assets/fonts/Pretendard-ExtraBold.otf") format("opentype")}
   @font-face{font-family:"Pretendard";font-weight:900;font-display:swap;src:local("Pretendard Black"),url("assets/fonts/Pretendard-Black.otf") format("opentype")}
+  /* Gyoza — 영문 디스플레이(블랙). 한글 글리프 없음 → 한글은 CookieRun 폴백 */
+  @font-face{font-family:"Gyoza";font-weight:100 900;font-style:normal;font-display:swap;src:url("assets/fonts/Gyoza-Black.otf") format("opentype")}
+  /* CookieRun — 한글 디스플레이(둥근). Gyoza와 페어링 */
+  @font-face{font-family:"CookieRun";font-weight:100 500;font-style:normal;font-display:swap;src:url("assets/fonts/CookieRun-Regular.ttf") format("truetype")}
+  @font-face{font-family:"CookieRun";font-weight:600 700;font-style:normal;font-display:swap;src:url("assets/fonts/CookieRun-Bold.ttf") format("truetype")}
+  @font-face{font-family:"CookieRun";font-weight:800 900;font-style:normal;font-display:swap;src:url("assets/fonts/CookieRun-Black.ttf") format("truetype")}
   :root{
     --white:#FFFFFF;--ink-900:#000;--ink-700:#333;--ink-500:#666;--ink-400:#999;
     --line-300:#DDD;--paper-0:#FAFAFC;
@@ -28,7 +34,7 @@
     --ticket-fill:#F2A015;--ticket-empty:#DDD;--danger:#DC2828;--soldout:#8A8A93;
     --surface-card:var(--white);--surface-glass:rgba(255,255,255,.07);--surface-glass-line:rgba(255,255,255,.16);
     --text-strong:var(--ink-900);--text-muted:var(--ink-500);--text-faint:var(--ink-400);
-    --font-sans:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    --font-sans:"Gyoza","CookieRun","Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
     --r-sm:8px;--r-md:12px;--r-lg:20px;--r-xl:28px;--r-2xl:36px;--r-pill:999px;
     --shadow-card:0 10px 28px rgba(11,4,34,.28);--shadow-pop:0 24px 64px rgba(8,2,28,.55);--shadow-inset-top:inset 0 2px 0 rgba(255,255,255,.55);
     --glow-purple:0 0 0 1px rgba(155,107,240,.55),0 0 24px rgba(123,63,228,.55),0 0 56px rgba(123,63,228,.30);
@@ -84,15 +90,34 @@
   .topbar .title { flex:1; line-height:1.3; }
   .topbar .title em { color:var(--gold-400); font-style:normal; font-weight:800; }
   .topbar .title small { display:block; font-weight:400; font-size:11px; opacity:.75; margin-top:3px; }
-  /* S1 브랜드 텍스트 스택 (박스 없이 — 영상 위 가독성용 그림자) */
-  .idle-brand { display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:0 24px; }
-  .idle-wordmark { width:200px; height:auto; filter:drop-shadow(0 2px 12px rgba(0,0,0,.6)); }
-  .idle-headline { color:#fff; font-weight:900; line-height:.98; letter-spacing:-.01em; }
-  .idle-headline .ld-1 { display:block; font-size:48px; text-shadow:0 3px 16px rgba(0,0,0,.72),0 1px 3px rgba(0,0,0,.6); }
-  .idle-headline .ld-2 { display:block; font-size:60px; color:var(--gold-400); text-shadow:0 3px 16px rgba(0,0,0,.72),0 2px 12px rgba(242,168,0,.45); }
-  .idle-sub { font-size:18px; font-weight:700; color:rgba(255,255,255,.94); text-shadow:0 2px 10px rgba(0,0,0,.75); }
+  /* S1 브랜드 텍스트 스택 (박스 없이 — 영상 위 가독성용 그림자 + 은은한 플로팅) */
+  .idle-brand { display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; padding:0 24px; animation:idleFloat 6s var(--ease-inout) infinite; }
+  @keyframes idleFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
+  .idle-wordmark { width:280px; height:auto; filter:drop-shadow(0 3px 14px rgba(0,0,0,.55)); }
+  .idle-headline { color:#fff; font-weight:900; line-height:.96; letter-spacing:-.02em; }
+  .idle-headline .ld-1 { display:block; font-size:100px; text-shadow:0 4px 18px rgba(0,0,0,.7),0 1px 3px rgba(0,0,0,.6); }
+  .idle-headline .ld-2 { display:block; font-size:128px; background:linear-gradient(180deg,#FFF1C2 0%,#FFD24D 46%,#F2A800 100%); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 2px 16px rgba(242,168,0,.55)) drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+  .idle-sub { font-size:34px; font-weight:700; letter-spacing:.01em; color:rgba(255,255,255,.95); text-shadow:0 2px 12px rgba(0,0,0,.78); }
   .idle-sub:empty { display:none; }
   .img-fallback { display:flex; align-items:center; justify-content:center; background:var(--prize-well); color:var(--purple-600); font-weight:800; }
+  /* 이미지 조정(위치/확대/크롭) — imgTag 래퍼가 클리핑, 안쪽 img에 transform 적용 */
+  .imgadj-wrap { overflow:hidden; }
+  .imgadj-wrap>img { width:100%; height:100%; display:block; object-fit:cover; }
+  .prize-cell .p-img>img, #reveal-card .r-img>img, #result-card .rc-img>img { object-fit:contain; }
+  #ip-hero-bg .imgadj-wrap { position:absolute; inset:0; }
+  /* 조정 모달 */
+  .adj-modal { position:absolute; inset:0; z-index:120; background:rgba(8,2,28,.78); display:flex; align-items:center; justify-content:center; padding:18px; }
+  .adj-box { width:100%; max-width:460px; background:var(--purple-900); border:1px solid var(--surface-glass-line); border-radius:var(--r-lg); padding:18px; color:#eee; box-shadow:var(--shadow-pop); }
+  .adj-title { font-weight:800; color:var(--gold-400); margin-bottom:12px; }
+  .adj-preview { width:100%; aspect-ratio:16/9; background:#000; border-radius:var(--r-md); overflow:hidden; margin-bottom:14px; cursor:grab; touch-action:none; user-select:none; }
+  .adj-preview.dragging { cursor:grabbing; }
+  .adj-preview img { width:100%; height:100%; display:block; object-fit:cover; pointer-events:none; -webkit-user-drag:none; }
+  .adj-ctrl { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .adj-ctrl label { width:64px; font-size:13px; color:#b3acd6; flex-shrink:0; }
+  .adj-ctrl input[type=range] { flex:1; accent-color:var(--gold-500); }
+  .adj-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+  /* 관리자 프라이즈 행 버튼 컴팩트 */
+  .prize-edit-row .adm-btn { padding:6px 2px; font-size:11px; }
   /* 등급 엠블럼 (공유) — data-tone으로 등급별 색 */
   .grade,.r-grade,.rc-grade { --g-from:#FFE9A8;--g-mid:var(--grade-a);--g-to:var(--grade-a-deep);
     border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; color:#fff; letter-spacing:-.02em; text-shadow:0 1px 2px rgba(0,0,0,.4);
@@ -107,23 +132,43 @@
   [data-tone="special"]{--g-from:#E7CCFF;--g-mid:var(--grade-special);--g-to:var(--grade-special-deep)}
   [data-tone="lucky"]{--g-from:#FFEAB0;--g-mid:var(--grade-lucky);--g-to:var(--grade-lucky-deep)}
 
-  /* S1 대기 */
-  #scr-idle { justify-content:center; align-items:center; cursor:pointer; gap:38px; }
+  /* S1 대기 — 시네마틱 폴리시(스포트라이트·비네팅·그레인·보케·시머·스파클) */
+  #scr-idle { justify-content:center; align-items:center; cursor:pointer; gap:40px; }
   #idle-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
-  #scr-idle > *:not(#idle-video):not(.bubbles):not(#admin-tap) { position:relative; z-index:2; }
-  #scr-idle .touch-banner { background:rgba(8,2,28,.64); border:1px solid rgba(255,255,255,.30); color:#fff; font-size:18px; font-weight:800; padding:15px 36px; border-radius:var(--r-pill); text-shadow:0 1px 4px rgba(0,0,0,.6); backdrop-filter:blur(8px); animation:pulse 1.6s infinite; }
-  @keyframes pulse { 0%{box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 0 rgba(255,201,60,.5)} 70%{box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 20px rgba(255,201,60,0)} 100%{box-shadow:0 8px 24px rgba(0,0,0,.4),0 0 0 0 rgba(255,201,60,0)} }
+  /* 루핑 영상/배경 가독성 레이어 — 차콜 35% 스크림 + 중앙 보라 스포트라이트 */
+  #scr-idle::before { content:""; position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(58% 42% at 50% 42%, rgba(155,107,240,.26), transparent 72%),
+      linear-gradient(rgba(46,46,51,.35), rgba(46,46,51,.35)); }
+  /* 미세 그레인 — 밴딩 제거·질감 */
+  #scr-idle::after { content:""; position:absolute; inset:0; z-index:1; pointer-events:none; opacity:.05; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size:120px 120px; }
+  #scr-idle > *:not(#idle-video):not(.bubbles):not(.idle-sparkles):not(#admin-tap) { position:relative; z-index:3; }
+  #scr-idle .touch-banner { position:relative; overflow:hidden; background:var(--grad-lucky); border:1px solid rgba(255,255,255,.5); color:var(--gold-ink); font-size:18px; font-weight:800; padding:15px 38px; border-radius:var(--r-pill); text-shadow:0 1px 1px rgba(255,255,255,.35); animation:pulse 1.6s infinite; }
+  #scr-idle .touch-banner::after { content:""; position:absolute; top:0; left:-65%; width:55%; height:100%; pointer-events:none; background:linear-gradient(100deg,transparent,rgba(255,255,255,.45),transparent); animation:bannerShimmer 3.4s ease-in-out infinite; }
+  @keyframes bannerShimmer { 0%{left:-65%} 55%,100%{left:135%} }
+  @keyframes pulse { 0%{box-shadow:var(--shadow-inset-top),0 8px 22px rgba(0,0,0,.38),0 0 0 0 rgba(255,201,60,.55)} 70%{box-shadow:var(--shadow-inset-top),0 8px 22px rgba(0,0,0,.38),0 0 0 20px rgba(255,201,60,0)} 100%{box-shadow:var(--shadow-inset-top),0 8px 22px rgba(0,0,0,.38),0 0 0 0 rgba(255,201,60,0)} }
   #scr-idle.soldout .touch-banner { background:rgba(80,80,90,.5); border-color:rgba(255,255,255,.12); animation:none; }
+  #scr-idle.soldout .touch-banner::after { display:none; }
+  /* 부유 보케 + 골드 더스트 */
   .bubbles { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:1; }
-  .bubbles i { position:absolute; display:block; border-radius:50%; background:rgba(255,255,255,.08); animation:rise linear infinite; }
+  .bubbles i { position:absolute; display:block; border-radius:50%; filter:blur(.5px); background:radial-gradient(circle at 35% 35%, rgba(192,163,247,.22), rgba(123,63,228,.05) 60%, transparent 72%); animation:rise linear infinite; }
+  .bubbles i:nth-child(3n) { background:radial-gradient(circle at 35% 35%, rgba(255,216,77,.18), rgba(242,168,0,.04) 55%, transparent 70%); }
   @keyframes rise { from{transform:translateY(110vh)} to{transform:translateY(-20vh)} }
+  /* 반짝이는 ✦ 스파클 (가장자리 위주) */
+  .idle-sparkles { position:absolute; inset:0; pointer-events:none; z-index:2; }
+  .idle-sparkles i { position:absolute; color:rgba(255,255,255,.92); text-shadow:0 0 8px rgba(255,216,77,.7); animation:sparkleTw 2.6s ease-in-out infinite; }
+  @keyframes sparkleTw { 0%,100%{opacity:.22;transform:scale(.7) rotate(0)} 50%{opacity:1;transform:scale(1.15) rotate(45deg)} }
   #admin-tap { position:absolute; top:0; right:0; width:110px; height:110px; z-index:9; }
-  #scr-idle .copyright { position:absolute; bottom:16px; font-size:11px; color:rgba(255,255,255,.5); }
+  #scr-idle .copyright { position:absolute; bottom:16px; font-size:11px; color:rgba(255,255,255,.5); z-index:3; }
 
-  /* S2 IP 선택 — 풀블리드 배너 카드 (이미지 + 좌측 스크림 위 텍스트) */
+  /* S2 IP 선택 — 상단 히어로(배경 이미지 + BI 로고 + 타이틀 오버레이) */
   #ip-hero { flex-shrink:0; height:200px; position:relative; overflow:hidden; display:flex; align-items:flex-end; }
-  #ip-hero img, #ip-hero .img-fallback { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; font-size:30px; }
-  #ip-hero h1 { position:relative; z-index:2; color:#fff; font-size:26px; font-weight:900; padding:18px; text-shadow:0 3px 12px rgba(0,0,0,.8); background:linear-gradient(to top,rgba(0,0,0,.65),transparent); width:100%; }
+  #ip-hero-bg { position:absolute; inset:0; z-index:0; }
+  #ip-hero-bg img, #ip-hero-bg .img-fallback { width:100%; height:100%; object-fit:cover; font-size:30px; }
+  .ip-hero-cap { position:relative; z-index:2; width:100%; padding:16px 18px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.15) 62%,transparent); }
+  .ip-hero-logo { width:150px; height:auto; filter:drop-shadow(0 2px 8px rgba(0,0,0,.65)); }
+  .ip-hero-line { color:#fff; font-size:24px; font-weight:900; letter-spacing:-.01em; line-height:1.2; text-shadow:0 2px 10px rgba(0,0,0,.85); }
   #ip-list { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
   .ip-card { background:#1a1030; border-radius:var(--r-lg); overflow:hidden; color:#fff; cursor:pointer; border:1.5px solid var(--surface-glass-line); transition:transform .14s; display:block; height:118px; position:relative; box-shadow:var(--shadow-card); }
   .ip-card:active { transform:scale(.99); }
@@ -246,7 +291,7 @@
   table.adm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
   table.adm-tbl th, table.adm-tbl td { border-bottom:1px solid #332a5e; padding:7px 5px; text-align:left; }
   table.adm-tbl th { color:var(--gold-400); }
-  .prize-edit-row { display:grid; grid-template-columns:46px 56px 1fr 64px 70px 36px; gap:5px; align-items:center; margin-bottom:6px; }
+  .prize-edit-row { display:grid; grid-template-columns:40px 46px 1fr 46px 48px 44px 26px; gap:4px; align-items:center; margin-bottom:6px; }
   .prize-edit-row input, .prize-edit-row select { padding:6px; border-radius:6px; border:1px solid #443a6e; background:var(--purple-950); color:#fff; font-size:12.5px; width:100%; }
   .prize-edit-row .del { background:var(--brand-red); color:#fff; border:none; border-radius:6px; height:32px; cursor:pointer; }
   .muted-note { font-size:11px; color:#9088b3; margin-top:4px; }
@@ -263,14 +308,16 @@
     .topbar .back { width:54px; height:54px; min-width:54px; font-size:27px; }
     .topbar .title small { font-size:14px; }
     .idle-brand { gap:22px; }
-    .idle-wordmark { width:300px; }
-    .idle-headline .ld-1 { font-size:72px; }
-    .idle-headline .ld-2 { font-size:92px; }
-    .idle-sub { font-size:26px; }
+    .idle-wordmark { width:440px; }
+    .idle-headline .ld-1 { font-size:144px; }
+    .idle-headline .ld-2 { font-size:184px; }
+    .idle-sub { font-size:52px; }
     #scr-idle { gap:54px; }
     #scr-idle .touch-banner { font-size:25px; padding:20px 48px; }
     #ip-hero { height:300px; }
-    #ip-hero h1 { font-size:36px; padding:26px; }
+    .ip-hero-cap { padding:24px 28px; gap:12px; }
+    .ip-hero-logo { width:220px; }
+    .ip-hero-line { font-size:34px; }
     #ip-list { padding:22px; gap:18px; }
     .ip-card { height:200px; }
     .ip-card .ipinfo { padding:0 80px 0 28px; gap:8px; }
@@ -316,11 +363,19 @@
   <div class="screen active" id="scr-idle">
     <video id="idle-video" muted loop playsinline autoplay style="display:none"></video>
     <div class="bubbles" id="bubbles"></div>
+    <div class="idle-sparkles">
+      <i style="top:15%;left:13%;font-size:14px;animation-delay:0s">✦</i>
+      <i style="top:23%;left:83%;font-size:20px;animation-delay:.5s">✦</i>
+      <i style="top:61%;left:9%;font-size:16px;animation-delay:1.1s">✦</i>
+      <i style="top:71%;left:87%;font-size:13px;animation-delay:1.7s">✦</i>
+      <i style="top:45%;left:91%;font-size:11px;animation-delay:.8s">✦</i>
+      <i style="top:12%;left:55%;font-size:12px;animation-delay:2.1s">✦</i>
+    </div>
     <div id="admin-tap"></div>
     <div class="idle-brand">
-      <img class="idle-wordmark" src="assets/com2us-store-lockup-white.svg" alt="COM2US STORE">
+      <img class="idle-wordmark" src="assets/com2us-store-logo-white.svg" alt="COM2US STORE">
       <div id="idle-logo" class="idle-headline"><span class="ld-1">LUCKY DRAW</span><span class="ld-2">EVENT</span></div>
-      <div class="idle-sub" id="idle-sub">컴투스 팝업 쿠지</div>
+      <div class="idle-sub" id="idle-sub">컴투스 사내 스토어</div>
     </div>
     <div class="touch-banner" id="idle-banner">화면을 터치하면 시작합니다.</div>
     <div class="copyright">2026 © Com2uS Popup Event</div>
@@ -332,7 +387,13 @@
       <button class="back" onclick="go('scr-idle')">←</button>
       <div class="title">참여할 상품을 선택하세요<small>상품을 터치하면 경품 라인업을 확인할 수 있습니다.</small></div>
     </div>
-    <div id="ip-hero"><div class="img-fallback">🎁</div><h1 id="ip-hero-title">컴투스 팝업 쿠지</h1></div>
+    <div id="ip-hero">
+      <div id="ip-hero-bg"></div>
+      <div class="ip-hero-cap">
+        <img class="ip-hero-logo" src="assets/com2us-store-logo-white.svg" alt="COM2US STORE">
+        <div class="ip-hero-line">LUCKY DRAW 제일복권 이벤트</div>
+      </div>
+    </div>
     <div id="ip-list"></div>
   </div>
 
@@ -418,6 +479,19 @@
   <div id="fx-flash"></div>
   <div class="confetti" id="confetti"></div>
   <div class="toast" id="toast"></div>
+
+  <!-- 이미지 조정 모달 -->
+  <div id="adjust-modal" class="adj-modal" style="display:none">
+    <div class="adj-box">
+      <div class="adj-title">이미지 조정 (위치 · 확대 · 크롭)</div>
+      <div class="adj-preview" id="adj-preview"><img id="adj-img" alt=""></div>
+      <div class="adj-ctrl"><label>가로 위치</label><input type="range" id="adj-x" min="0" max="100" value="50" oninput="adjApplyPreview()"></div>
+      <div class="adj-ctrl"><label>세로 위치</label><input type="range" id="adj-y" min="0" max="100" value="50" oninput="adjApplyPreview()"></div>
+      <div class="adj-ctrl"><label>확대</label><input type="range" id="adj-s" min="100" max="300" value="100" oninput="adjApplyPreview()"></div>
+      <div class="muted-note">미리보기를 <b>드래그</b>해 위치 이동 · 슬라이더로 미세조정/확대 · 프레임 밖은 잘림(크롭) · 원본 보존</div>
+      <div class="adj-actions"><button class="adm-btn sec" onclick="adjReset()">초기화</button><button class="adm-btn sec" onclick="adjClose()">취소</button><button class="adm-btn pri" onclick="adjSave()">적용</button></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -482,13 +556,18 @@ function idbDel(key){ return new Promise((res)=>{ if(!idb||!key)return res(); co
 const imgCache={};
 async function loadAllImages(){
   const keys=new Set();
+  if(cfg.heroBannerKey)keys.add(cfg.heroBannerKey);
   cfg.ips.forEach(ip=>{ if(ip.heroImageKey)keys.add(ip.heroImageKey); if(ip.lastOne&&ip.lastOne.imageKey)keys.add(ip.lastOne.imageKey); ip.prizes.forEach(p=>{ if(p.imageKey)keys.add(p.imageKey); }); });
   for(const k of keys){ imgCache[k]=await idbGet(k); }
 }
 /* img 또는 fallback 마크업 */
 function imgTag(key, cls, emoji){
   const src=key?imgCache[key]:null;
-  if(src) return `<img class="${cls}" src="${src}" alt="">`;
+  if(src){
+    const a=cfg.imgAdjust&&cfg.imgAdjust[key];
+    const st=a?` style="object-position:${a.x}% ${a.y}%;transform:scale(${a.scale});transform-origin:${a.x}% ${a.y}%"`:'';
+    return `<div class="${cls} imgadj-wrap"><img src="${src}"${st} alt=""></div>`;
+  }
   return `<div class="${cls} img-fallback">${emoji||'🎁'}</div>`;
 }
 
@@ -512,7 +591,6 @@ document.getElementById('kiosk').addEventListener('pointerdown', resetIdle, true
 /* ════════════════ S1 대기 ════════════════ */
 let curIp=null, drawing=false, lastResult=null, lastNpcId=null;
 async function bootIdle(){
-  document.getElementById('idle-sub').textContent = cfg.eventName || '';
   // 대기 영상
   const vid=await idbGet('idle_video'); const v=document.getElementById('idle-video');
   if(v._ourl){ try{ URL.revokeObjectURL(v._ourl); }catch(e){} v._ourl=null; }
@@ -536,10 +614,9 @@ document.getElementById('scr-idle').addEventListener('click', e=>{
 /* ════════════════ S2 IP 선택 ════════════════ */
 function goIp(){ renderIp(); go('scr-ip'); }
 async function renderIp(){
-  document.getElementById('ip-hero-title').textContent=cfg.eventName||'';
-  // 히어로 이미지 (첫 IP의 hero 또는 없음)
-  const heroWrap=document.getElementById('ip-hero');
-  heroWrap.querySelector('img,.img-fallback').outerHTML = imgTag(cfg.ips[0]&&cfg.ips[0].heroImageKey, '', '🎁');
+  // 상단 히어로 배경: 전용 배너 우선, 없으면 첫 IP 배너, 그것도 없으면 기본. 타이틀은 고정 마크업.
+  const heroKey = cfg.heroBannerKey || (cfg.ips[0]&&cfg.ips[0].heroImageKey);
+  document.getElementById('ip-hero-bg').innerHTML = imgTag(heroKey, '', '🎁');
   const list=document.getElementById('ip-list'); list.innerHTML='';
   cfg.ips.forEach(ip=>{
     const remain=remainOf(ip), total=totalOf(ip), sold=remain===0;
@@ -742,17 +819,18 @@ function renderAdmIps(){
         <input value="${escAttr(p.name)}" onchange="admEditPrize(${ii},${pi},'name',this.value)" placeholder="경품명">
         <input type="number" min="0" value="${p.count}" onchange="admEditPrize(${ii},${pi},'count',this.value)">
         <button class="adm-btn sec" onclick="admPickImg(${ii},${pi})">이미지</button>
+        <button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].prizes[${pi}].imageKey,'prize')">조정</button>
         <button class="del" onclick="admDelPrize(${ii},${pi})">×</button>
       </div>`;
     });
     card.innerHTML=`
       <h4>IP ${ii+1} <button class="adm-btn dng" style="float:right" onclick="admDelIp(${ii})">IP 삭제</button></h4>
       <div class="adm-row"><label>IP명</label><input value="${escAttr(ip.name)}" onchange="admEditIp(${ii},'name',this.value)"></div>
-      <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
+      <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].heroImageKey,'ipcard')">조정</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
       <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">등급 / 상위·일반 / 경품명 / 수량 / 이미지</div>
       ${prizeRows}
       <button class="adm-btn sec" onclick="admAddPrize(${ii})">+ 등급 추가</button>
-      <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button></div>
+      <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button><button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].lastOne||{}).imageKey,'lucky')">조정</button></div>
       <div class="muted-note">행운상: 각 등급의 마지막 1개를 뽑은 참여자에게 현장 지급</div>`;
     root.appendChild(card);
   });
@@ -830,6 +908,10 @@ function renderAdmSettings(){
     <div class="adm-row"><label>음소거</label><button class="adm-btn ${cfg.muted?'dng':'sec'}" onclick="toggleMute()">${cfg.muted?'🔇 음소거 ON':'🔊 소리 ON'}</button></div>
     <button class="adm-btn pri" style="width:100%;margin-top:8px" onclick="saveSettings()">설정 저장</button>
   </div>
+  <div class="adm-card"><h4>S2 상단 히어로 배너</h4>
+    <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHeroBanner()">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.heroBannerKey,'hero')">조정</button><button class="adm-btn dng" onclick="delHeroBanner()">삭제</button><span class="adm-thumb">${cfg.heroBannerKey&&imgCache[cfg.heroBannerKey]?`<img src="${imgCache[cfg.heroBannerKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
+    <div class="muted-note">IP 선택(S2) 화면 상단 배너 전용. 미설정 시 1번 IP 배너를 사용 · 가로형 권장</div>
+  </div>
   <div class="adm-card"><h4>대기 영상</h4>
     <div class="adm-row"><label>대기영상</label><button class="adm-btn sec" onclick="uploadMedia('idle_video','video/*')">영상 업로드</button><button class="adm-btn dng" onclick="delMedia('idle_video')">삭제</button></div>
     <div class="muted-note">세로 MP4, 무음, 최대 150MB (빠른 로딩엔 50MB↓ 권장)</div>
@@ -853,6 +935,42 @@ function renderAdmSettings(){
   </div>`;
 }
 function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); saveCfg(); bootIdle(); toast('설정 저장됨'); }
+async function admPickHeroBanner(){ const key='hero_banner_'+Date.now(); const k=await uploadImg(key); if(k){ if(cfg.heroBannerKey){try{await idbDel(cfg.heroBannerKey);}catch(e){}} cfg.heroBannerKey=k; saveCfg(); toast('히어로 배너 등록됨'); renderAdmSettings(); } }
+async function delHeroBanner(){ if(cfg.heroBannerKey){ try{await idbDel(cfg.heroBannerKey);}catch(e){} cfg.heroBannerKey=null; saveCfg(); toast('삭제됨'); renderAdmSettings(); } }
+
+/* ── 이미지 조정 모달 (위치·확대·크롭, 모든 이미지 공통) ── */
+let adjKey=null;
+function openAdjust(key, kind){
+  if(!key||!imgCache[key]){ toast('먼저 이미지를 업로드하세요'); return; }
+  adjKey=key;
+  // 실제 화면에서의 표시 비율을 계산해 미리보기에 그대로 적용 (현재 키오스크 폭 기준)
+  const kioskW=(document.getElementById('kiosk').clientWidth)||520;
+  const tab=kioskW>=600;
+  let aspect, fit='cover';
+  if(kind==='hero'){ aspect=kioskW/(tab?300:200); }
+  else if(kind==='ipcard'){ const pad=(tab?22:14)*2; aspect=(kioskW-pad)/(tab?200:118); }
+  else { aspect=1; fit='contain'; } // 경품/행운상 = 정사각(contain)
+  const a=(cfg.imgAdjust&&cfg.imgAdjust[key])||{x:50,y:50,scale:1};
+  document.getElementById('adj-preview').style.aspectRatio=(+aspect).toFixed(4);
+  const img=document.getElementById('adj-img'); img.src=imgCache[key]; img.style.objectFit=fit;
+  document.getElementById('adj-x').value=a.x; document.getElementById('adj-y').value=a.y; document.getElementById('adj-s').value=Math.round((a.scale||1)*100);
+  adjApplyPreview();
+  document.getElementById('adjust-modal').style.display='flex';
+}
+function adjVals(){ return { x:+document.getElementById('adj-x').value, y:+document.getElementById('adj-y').value, s:(+document.getElementById('adj-s').value)/100 }; }
+function adjApplyPreview(){ const v=adjVals(); const img=document.getElementById('adj-img'); img.style.objectPosition=v.x+'% '+v.y+'%'; img.style.transform='scale('+v.s+')'; img.style.transformOrigin=v.x+'% '+v.y+'%'; }
+function adjReset(){ document.getElementById('adj-x').value=50; document.getElementById('adj-y').value=50; document.getElementById('adj-s').value=100; adjApplyPreview(); }
+function adjClose(){ document.getElementById('adjust-modal').style.display='none'; adjKey=null; }
+function adjSave(){ if(!adjKey)return; const v=adjVals(); cfg.imgAdjust=cfg.imgAdjust||{}; if(v.x===50&&v.y===50&&v.s===1){ delete cfg.imgAdjust[adjKey]; } else { cfg.imgAdjust[adjKey]={x:v.x,y:v.y,scale:v.s}; } saveCfg(); toast('조정 저장됨'); adjClose(); }
+/* 미리보기 드래그-이동 → 가로/세로 위치 슬라이더와 실시간 동기화 */
+(function initAdjDrag(){
+  const pv=document.getElementById('adj-preview'); if(!pv)return;
+  let drag=false,sx,sy,svx,svy,w,h;
+  pv.addEventListener('pointerdown',function(e){ drag=true; pv.classList.add('dragging'); try{pv.setPointerCapture(e.pointerId);}catch(_){} sx=e.clientX; sy=e.clientY; svx=+document.getElementById('adj-x').value; svy=+document.getElementById('adj-y').value; const r=pv.getBoundingClientRect(); w=r.width||1; h=r.height||1; e.preventDefault(); });
+  pv.addEventListener('pointermove',function(e){ if(!drag)return; const s=(+document.getElementById('adj-s').value)/100||1; let nx=svx-(e.clientX-sx)/w*100/s; let ny=svy-(e.clientY-sy)/h*100/s; nx=Math.max(0,Math.min(100,Math.round(nx))); ny=Math.max(0,Math.min(100,Math.round(ny))); document.getElementById('adj-x').value=nx; document.getElementById('adj-y').value=ny; adjApplyPreview(); });
+  function end(){ drag=false; pv.classList.remove('dragging'); }
+  pv.addEventListener('pointerup',end); pv.addEventListener('pointercancel',end);
+})();
 function toggleMute(){ cfg.muted=!cfg.muted; saveCfg(); applyMute(); renderAdmSettings(); }
 async function uploadMedia(key,accept){
   const f=await pickFile(accept); if(!f)return;
@@ -900,6 +1018,7 @@ document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
   reconcileStock();
   // npcs 배열 보정 + 기존 단일 NPC(draw_npc) 자동 이전
   if(!Array.isArray(cfg.npcs)) cfg.npcs=[];
+  if(!cfg.imgAdjust) cfg.imgAdjust={};
   try{
     if(cfg.npcs.length===0){
       const old=await idbGet('draw_npc');
