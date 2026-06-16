@@ -220,14 +220,14 @@
   .prize-cell .out-badge { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(40,38,48,.5); color:#fff; font-weight:900; font-size:20px; letter-spacing:.04em; border-radius:var(--r-lg); z-index:2; }
   .prize-cell.out .out-badge { display:flex; }
   .lineup-footer { flex-shrink:0; padding:14px 0 18px; background:rgba(8,2,28,.32); }
-  .lineup-footer .hint { text-align:center; color:rgba(255,255,255,.82); font-size:12px; margin-bottom:12px; padding:0 16px; word-break:keep-all; }
+  .lineup-footer .hint { text-align:center; color:rgba(255,255,255,.82); font-size:16px; margin-bottom:12px; padding:0 16px; word-break:keep-all; }
 
   /* S4 뽑기 — 중앙 네온 프레임 박스 + NPC */
   #scr-draw { color:#fff; }
   #draw-stage { flex:1; display:flex; align-items:center; justify-content:center; padding:20px; }
-  #draw-box { position:relative; width:100%; max-width:380px; padding:8px 22px 28px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:20px; animation:cardIn .5s cubic-bezier(.2,1.5,.4,1); }
+  #draw-box { position:relative; width:min(82vw,56vh); padding:6px 0 8px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px; animation:cardIn .5s cubic-bezier(.2,1.5,.4,1); }
   @keyframes ld-twinkle2 { 0%,100%{opacity:.35;transform:scale(.8) rotate(0)} 50%{opacity:1;transform:scale(1.15) rotate(45deg)} }
-  #draw-box .npc-art { position:relative; width:285px; aspect-ratio:578/615; }
+  #draw-box .npc-art { position:relative; width:100%; aspect-ratio:578/615; }
   #draw-box .npc-art .npc-media { position:absolute; inset:6.5%; border-radius:18px; overflow:hidden; font-size:108px; display:flex; align-items:center; justify-content:center; background:#160A33; }
   #draw-box .npc-art .npc-media>img, #draw-box .npc-art .npc-media>video { width:100%; height:100%; object-fit:cover; display:block; }
   #draw-box .npc-art .npc-frame { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
@@ -277,9 +277,9 @@
   #result-card.lastone-extra { filter:drop-shadow(0 0 16px var(--gold-400)) drop-shadow(0 8px 24px rgba(0,0,0,.5)); }
   #result-lastone { background:var(--grad-lucky); color:var(--gold-ink); border-radius:var(--r-lg); width:var(--cw); padding:16px; text-align:center; font-weight:800; font-size:17px; box-shadow:var(--glow-gold-sm); }
   #result-lastone .rl-name { font-size:24px; margin-top:6px; color:var(--text-strong); }
-  #result-meta { color:rgba(255,255,255,.92); font-size:14px; text-align:center; white-space:nowrap; }
+  #result-meta { color:rgba(255,255,255,.92); font-size:16px; text-align:center; white-space:nowrap; }
   #result-meta b { color:var(--gold-400); }
-  #result-hint { font-size:18px; color:rgba(255,255,255,.8); }
+  #result-hint { font-size:20px; color:rgba(255,255,255,.8); }
   #result-infobox { width:var(--cw); display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; word-break:keep-all; overflow-wrap:break-word; }
   #scr-result .btn-yellow { width:var(--cw); margin-top:16px; }
 
@@ -351,9 +351,8 @@
     .prize-cell .p-sub { font-size:16px; }
     .ticket-gauge i { width:15px; height:19px; }
     .lineup-footer { padding:18px 0 26px; }
-    .lineup-footer .hint { font-size:16px; margin-bottom:16px; }
-    #draw-box { max-width:560px; padding:40px 32px 44px; gap:26px; }
-    #draw-box .npc-art { width:380px; }
+    .lineup-footer .hint { font-size:22px; margin-bottom:16px; }
+    #draw-box { gap:22px; }
     #draw-box .npc-art .npc-media { font-size:165px; }
     #draw-box .draw-msg { font-size:23px; }
     #reveal-sub { font-size:19px; }
@@ -361,8 +360,8 @@
     #scr-result h2 { font-size:96px; }
     #result-lastone { font-size:19px; padding:12px; }
     #result-lastone .rl-name { font-size:26px; }
-    #result-meta { font-size:16px; }
-    #result-hint { font-size:16px; }
+    #result-meta { font-size:18px; }
+    #result-hint { font-size:22px; }
     #scr-result .btn-yellow { margin-top:28px; }
   }
 </style>
@@ -395,7 +394,7 @@
   <!-- S2 IP 선택 -->
   <div class="screen" id="scr-ip">
     <div class="topbar">
-      <button class="back" onclick="go('scr-idle')">←</button>
+      <button class="back" onclick="resetToIdle()">←</button>
       <div class="title">참여할 상품을 선택하세요<small>상품을 터치하면 경품 라인업을 확인할 수 있습니다.</small></div>
     </div>
     <div id="ip-hero">
@@ -519,7 +518,7 @@ const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1';
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
   return {
-    eventName:'컴투스 팝업 쿠지', adminPin:'0000', idleTimeoutSec:30, muted:false, npcs:[],
+    eventName:'컴투스 팝업 쿠지', adminPin:'0000', idleTimeoutSec:30, muted:false, npcs:[], idleVideos:[],
     ips:[{
       id:'ip1', name:'서머너즈 워 컬렉션', heroImageKey:null,
       lastOne:{ name:'스토어 할인 쿠폰', imageKey:null },
@@ -607,13 +606,24 @@ function resetIdle(){ if(idleScreens.includes(currentScreen)) manageIdle(); }
 document.getElementById('kiosk').addEventListener('pointerdown', resetIdle, true);
 
 /* ════════════════ S1 대기 ════════════════ */
-let curIp=null, drawing=false, lastResult=null, lastNpcId=null;
-async function bootIdle(){
-  // 대기 영상
-  const vid=await idbGet('idle_video'); const v=document.getElementById('idle-video');
+let curIp=null, drawing=false, lastResult=null, lastNpcId=null, lastIdleVideoId=null;
+async function playIdleVideo(){
+  const v=document.getElementById('idle-video');
   if(v._ourl){ try{ URL.revokeObjectURL(v._ourl); }catch(e){} v._ourl=null; }
-  if(vid){ try{ const src=(typeof vid==='string')?vid:(v._ourl=URL.createObjectURL(vid)); v.src=src; v.style.display='block'; v.play().catch(()=>{}); }catch(e){ v.style.display='none'; } }
+  const vids=cfg.idleVideos||[];
+  let blob=null;
+  if(vids.length){
+    let pool=vids;
+    if(vids.length>1 && lastIdleVideoId){ const f=vids.filter(x=>x.id!==lastIdleVideoId); if(f.length) pool=f; }
+    const pick=pool[Math.floor(Math.random()*pool.length)];
+    lastIdleVideoId=pick.id;
+    blob=await idbGet('idlevid_'+pick.id);
+  }
+  if(blob){ try{ const src=(typeof blob==='string')?blob:(v._ourl=URL.createObjectURL(blob)); v.src=src; v.style.display='block'; v.play().catch(()=>{}); }catch(e){ v.style.display='none'; } }
   else { v.removeAttribute('src'); v.style.display='none'; }
+}
+async function bootIdle(){
+  await playIdleVideo();
   refreshIdleSoldout();
 }
 function refreshIdleSoldout(){
@@ -773,7 +783,7 @@ function renderResult(){
 }
 function resetToIdle(){
   drawing=false; lastResult=null; curIp=null;
-  refreshIdleSoldout(); startBgm('idle');
+  refreshIdleSoldout(); startBgm('idle'); playIdleVideo();
   go('scr-idle');
 }
 
@@ -921,6 +931,7 @@ function admClearLog(){ if(confirm('당첨 로그를 모두 삭제할까요? (CS
 function renderAdmSettings(){
   const root=document.getElementById('pane-settings');
   const npcRows=(cfg.npcs||[]).map((n,i)=>`<div class="adm-row"><label>NPC ${i+1}</label><span style="flex:1">${n.type==='video'?'🎬 영상':'🖼 이미지'}</span><button class="adm-btn dng" onclick="delNpc('${n.id}')">삭제</button></div>`).join('') || '<div class="muted-note">등록된 NPC 없음 (없으면 기본 🎴 표시)</div>';
+  const idleVidRows=(cfg.idleVideos||[]).map((x,i)=>`<div class="adm-row"><label>영상 ${i+1}</label><span style="flex:1">🎬 영상</span><button class="adm-btn dng" onclick="delIdleVideo('${x.id}')">삭제</button></div>`).join('') || '<div class="muted-note">등록된 대기영상 없음</div>';
   root.innerHTML=`<div class="adm-card"><h4>기본 설정</h4>
     <div class="adm-row"><label>이벤트명</label><input id="set-name" value="${escAttr(cfg.eventName)}"></div>
     <div class="adm-row"><label>PIN</label><input id="set-pin" value="${escAttr(cfg.adminPin)}"></div>
@@ -932,9 +943,10 @@ function renderAdmSettings(){
     <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHeroBanner()">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.heroBannerKey,'hero')">조정</button><button class="adm-btn dng" onclick="delHeroBanner()">삭제</button><span class="adm-thumb">${cfg.heroBannerKey&&imgCache[cfg.heroBannerKey]?`<img src="${imgCache[cfg.heroBannerKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
     <div class="muted-note">IP 선택(S2) 화면 상단 배너 전용. 미설정 시 1번 IP 배너를 사용 · 가로형 권장</div>
   </div>
-  <div class="adm-card"><h4>대기 영상</h4>
-    <div class="adm-row"><label>대기영상</label><button class="adm-btn sec" onclick="uploadMedia('idle_video','video/*')">영상 업로드</button><button class="adm-btn dng" onclick="delMedia('idle_video')">삭제</button></div>
-    <div class="muted-note">세로 MP4, 무음, 최대 150MB (빠른 로딩엔 50MB↓ 권장)</div>
+  <div class="adm-card"><h4>대기 영상 (여러 개 = 진입마다 랜덤)</h4>
+    ${idleVidRows}
+    <div class="adm-row" style="margin-top:8px"><button class="adm-btn sec" onclick="addIdleVideo()">+ 영상 추가</button></div>
+    <div class="muted-note">대기화면에 들어갈 때마다 랜덤으로 하나 재생(직전과 다른 영상) · 세로 MP4 무음 · 최대 150MB</div>
   </div>
   <div class="adm-card"><h4>뽑기 NPC (여러 개 = 랜덤 표시)</h4>
     ${npcRows}
@@ -1022,6 +1034,18 @@ async function addNpc(accept,type){
 }
 async function delNpc(id){ await idbDel('npc_'+id); cfg.npcs=(cfg.npcs||[]).filter(n=>n.id!==id); saveCfg(); toast('삭제됨'); renderAdmSettings(); }
 
+/* 대기영상 (여러 개 → 대기화면 진입마다 랜덤, 직전 제외) */
+async function addIdleVideo(){
+  const f=await pickFile('video/*'); if(!f)return;
+  if(f.size>150*1024*1024){ toast('150MB 이하만 가능'); return; }
+  const id='iv'+Date.now()+Math.floor(Math.random()*1000);
+  await idbPut('idlevid_'+id, f);
+  if(!Array.isArray(cfg.idleVideos)) cfg.idleVideos=[];
+  cfg.idleVideos.push({id}); saveCfg();
+  toast('대기영상 추가됨'); renderAdmSettings();
+}
+async function delIdleVideo(id){ await idbDel('idlevid_'+id); cfg.idleVideos=(cfg.idleVideos||[]).filter(x=>x.id!==id); saveCfg(); toast('삭제됨'); renderAdmSettings(); }
+
 /* ════════════════ 유틸 ════════════════ */
 function dataURLtoBlob(d){ try{ const [h,b]=d.split(','); const mime=(h.match(/:(.*?);/)||[])[1]||'image/png'; const bin=atob(b); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return new Blob([u],{type:mime}); }catch(e){ return null; } }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
@@ -1044,6 +1068,15 @@ document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
       const old=await idbGet('draw_npc');
       if(old){ const id='n'+Date.now(); const blob=(typeof old==='string')?dataURLtoBlob(old):old;
         if(blob){ await idbPut('npc_'+id,blob); cfg.npcs.push({id,type:'image'}); saveCfg(); await idbDel('draw_npc'); } }
+    }
+  }catch(e){}
+  // 대기영상: 기존 단일 idle_video → idleVideos 배열 자동 이전
+  if(!Array.isArray(cfg.idleVideos)) cfg.idleVideos=[];
+  try{
+    if(cfg.idleVideos.length===0){
+      const oldv=await idbGet('idle_video');
+      if(oldv){ const id='iv'+Date.now(); const blob=(typeof oldv==='string')?dataURLtoBlob(oldv):oldv;
+        if(blob){ await idbPut('idlevid_'+id,blob); cfg.idleVideos.push({id}); saveCfg(); await idbDel('idle_video'); } }
     }
   }catch(e){}
   await loadAllImages();
