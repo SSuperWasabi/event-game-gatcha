@@ -118,19 +118,16 @@
   .adj-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
   /* 관리자 프라이즈 행 버튼 컴팩트 */
   .prize-edit-row .adm-btn { padding:6px 2px; font-size:11px; }
-  /* 등급 엠블럼 (공유) — data-tone으로 등급별 색 */
-  .grade,.r-grade,.rc-grade { --g-from:#FFE9A8;--g-mid:var(--grade-a);--g-to:var(--grade-a-deep);
-    border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:900; color:#fff; letter-spacing:-.02em; text-shadow:0 1px 2px rgba(0,0,0,.4);
-    background:radial-gradient(circle at 36% 27%,rgba(255,255,255,.85) 0%,var(--g-from) 22%,var(--g-mid) 52%,var(--g-to) 86%);
-    box-shadow:0 0 0 3px var(--g-to),0 0 0 4px rgba(255,255,255,.7),inset 0 2px 4px rgba(255,255,255,.6),inset 0 -5px 8px rgba(0,0,0,.34),0 6px 14px rgba(11,4,34,.4); }
-  [data-tone="a"]{--g-from:#FFE9A8;--g-mid:var(--grade-a);--g-to:var(--grade-a-deep)}
-  [data-tone="b"]{--g-from:#C4E3FF;--g-mid:var(--grade-b);--g-to:var(--grade-b-deep)}
-  [data-tone="c"]{--g-from:#C2F0B9;--g-mid:var(--grade-c);--g-to:var(--grade-c-deep)}
-  [data-tone="d"]{--g-from:#E3CCFF;--g-mid:var(--grade-d);--g-to:var(--grade-d-deep)}
-  [data-tone="e"]{--g-from:#F6D2AC;--g-mid:var(--grade-e);--g-to:var(--grade-e-deep)}
-  [data-tone="f"]{--g-from:#ACEEE8;--g-mid:var(--grade-f);--g-to:var(--grade-f-deep)}
-  [data-tone="special"]{--g-from:#E7CCFF;--g-mid:var(--grade-special);--g-to:var(--grade-special-deep)}
-  [data-tone="lucky"]{--g-from:#FFEAB0;--g-mid:var(--grade-lucky);--g-to:var(--grade-lucky-deep)}
+  /* 등급 엠블럼 (공유) — AI 생성 메달 이미지(글자 베이크됨), data-tone으로 매핑 */
+  .grade,.r-grade,.rc-grade { background:center/contain no-repeat; font-size:0; color:transparent; border:none; box-shadow:none; }
+  [data-tone="a"]{background-image:url("assets/badges/badge-a.png")}
+  [data-tone="b"]{background-image:url("assets/badges/badge-b.png")}
+  [data-tone="c"]{background-image:url("assets/badges/badge-c.png")}
+  [data-tone="d"]{background-image:url("assets/badges/badge-d.png")}
+  [data-tone="e"]{background-image:url("assets/badges/badge-e.png")}
+  [data-tone="f"]{background-image:url("assets/badges/badge-f.png")}
+  [data-tone="special"]{background-image:url("assets/badges/badge-special.png")}
+  [data-tone="lucky"]{background-image:url("assets/badges/badge-lucky.png")}
 
   /* S1 대기 — 시네마틱 폴리시(스포트라이트·비네팅·그레인·보케·시머·스파클) */
   #scr-idle { justify-content:center; align-items:center; cursor:pointer; gap:40px; }
@@ -184,27 +181,27 @@
   .ip-card .soldout-badge { position:absolute; top:10px; right:10px; z-index:3; background:var(--soldout); color:#fff; font-size:12px; font-weight:900; letter-spacing:.04em; padding:5px 12px; border-radius:var(--r-pill); display:none; }
   .ip-card.soldout .soldout-badge { display:block; }
 
-  /* S3 경품 라인업 — 흰 카드 (등급 엠블럼 오버랩 + 이미지 좌 / 이름·게이지 우) */
-  #prize-grid { flex:1; overflow-y:auto; padding:18px 14px; display:grid; grid-template-columns:1fr 1fr; gap:14px; align-content:start; }
-  .prize-cell { display:flex; align-items:center; gap:12px; background:var(--surface-card); border-radius:var(--r-lg); border:1px solid rgba(255,255,255,.7); padding:14px 12px 14px 12px; position:relative; box-shadow:var(--shadow-card); }
-  .prize-cell::after { content:"✦✦"; position:absolute; top:9px; right:12px; font-size:12px; letter-spacing:2px; color:rgba(123,63,228,.28); pointer-events:none; }
-  .prize-cell.lucky { background:var(--grad-lucky); border-color:rgba(255,255,255,.6); box-shadow:var(--glow-gold-sm),var(--shadow-card); }
-  .prize-cell.lucky::after { color:rgba(255,255,255,.7); }
-  .prize-cell .grade { position:absolute; top:-10px; left:-8px; z-index:2; width:56px; height:56px; font-size:17px; }
-  .prize-cell .grade[data-tone="special"] { font-size:11px; }
-  .prize-cell.lucky .grade { font-size:12px; }
-  .prize-cell .p-img { flex-shrink:0; width:104px; height:104px; border-radius:var(--r-md); object-fit:contain; background:var(--prize-well); font-size:46px; }
-  .prize-cell .p-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; }
-  .prize-cell .p-name { font-size:15px; font-weight:800; color:var(--text-strong); line-height:1.3; word-break:keep-all; }
-  .prize-cell.lucky .p-name { color:var(--gold-ink); }
-  .prize-cell .p-stock { font-size:12px; color:var(--text-muted); }
-  .prize-cell.lucky .p-stock { color:rgba(90,61,0,.8); }
-  .prize-cell .p-stock b { color:var(--danger); font-size:15px; font-weight:800; }
+  /* S3 경품 라인업 — 다크 카드 + 좌 이미지 / 우 흰 정보패널 */
+  #prize-grid { flex:1; overflow-y:auto; padding:20px 14px; display:grid; grid-template-columns:1fr 1fr; gap:16px; align-content:start; }
+  .prize-cell { display:flex; align-items:stretch; gap:12px; background:linear-gradient(160deg,#2A1860,#160A33); border-radius:var(--r-lg); border:1.5px solid rgba(155,107,240,.4); padding:12px 12px 12px 14px; position:relative; box-shadow:var(--shadow-card); min-height:152px; }
+  .prize-cell::after { content:"✦✦"; position:absolute; top:10px; right:14px; font-size:12px; letter-spacing:2px; color:rgba(192,163,247,.55); pointer-events:none; z-index:2; }
+  .prize-cell.lucky { background:var(--grad-lucky); border-color:rgba(255,255,255,.55); box-shadow:var(--glow-gold-sm),var(--shadow-card); }
+  .prize-cell.lucky::after { color:rgba(255,255,255,.8); }
+  .prize-cell .grade { position:absolute; top:-12px; left:-10px; z-index:3; width:64px; height:64px; }
+  .prize-cell .p-img { flex:1.1; align-self:stretch; border-radius:var(--r-md); object-fit:contain; background:rgba(0,0,0,.2); font-size:48px; min-width:0; }
+  .prize-cell .p-body { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:8px; background:#fff; border-radius:var(--r-md); padding:12px 14px; }
+  .prize-cell .p-name { font-size:16px; font-weight:800; color:var(--text-strong); line-height:1.25; word-break:keep-all; }
+  .prize-cell .p-meta { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted); border-top:1px solid #ececec; padding-top:9px; }
+  .prize-cell .p-meta .tk-chip { width:22px; height:15px; border-radius:3px; transform:rotate(-8deg); background:linear-gradient(180deg,#FFD14A,#F2A015); box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); flex-shrink:0; }
+  .prize-cell .p-meta b { color:var(--text-strong); font-size:19px; font-weight:900; }
+  .prize-cell .p-meta b.low { color:var(--danger); }
+  .prize-cell .p-meta .tot { color:var(--text-faint); font-weight:700; }
+  .prize-cell .p-sub { font-size:13px; color:var(--text-muted); border-top:1px solid #ececec; padding-top:9px; }
   .ticket-gauge { display:flex; flex-wrap:wrap; gap:4px; }
   .ticket-gauge i { width:12px; height:15px; border-radius:3px; background:var(--ticket-empty); }
   .ticket-gauge i.on { background:var(--ticket-fill); box-shadow:inset 0 0 0 1px rgba(0,0,0,.08); }
   .prize-cell.out { filter:grayscale(.9); opacity:.55; }
-  .prize-cell .out-badge { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(40,38,48,.5); color:#fff; font-weight:900; font-size:20px; letter-spacing:.04em; border-radius:var(--r-lg); }
+  .prize-cell .out-badge { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(40,38,48,.5); color:#fff; font-weight:900; font-size:20px; letter-spacing:.04em; border-radius:var(--r-lg); z-index:2; }
   .prize-cell.out .out-badge { display:flex; }
   .lineup-footer { flex-shrink:0; padding:14px 0 18px; background:rgba(8,2,28,.32); }
   .lineup-footer .hint { text-align:center; color:rgba(255,255,255,.82); font-size:12px; margin-bottom:12px; padding:0 16px; word-break:keep-all; }
@@ -232,7 +229,7 @@
   #scr-reveal { justify-content:center; align-items:center; gap:10px; color:#fff; }
   #reveal-card { width:250px; min-height:330px; border-radius:var(--r-xl); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:22px; background:#fff; color:var(--text-strong); animation:cardIn .55s cubic-bezier(.2,1.6,.4,1); box-shadow:var(--glow-gold-sm),var(--shadow-pop); }
   @keyframes cardIn { from{transform:scale(.2) rotate(-12deg);opacity:0} to{transform:none;opacity:1} }
-  #reveal-card .r-grade { width:84px; height:84px; font-size:26px; }
+  #reveal-card .r-grade { width:96px; height:96px; }
   #reveal-card .r-img { width:120px; height:120px; border-radius:var(--r-md); object-fit:contain; background:var(--prize-well); font-size:60px; }
   #reveal-card .r-name { font-size:16px; font-weight:800; text-align:center; line-height:1.4; word-break:keep-all; }
   #reveal-card.high { background:linear-gradient(160deg,#FFF7D6,#FFE588); box-shadow:0 0 70px rgba(255,200,0,.8); }
@@ -254,7 +251,7 @@
   #scr-result { color:#fff; justify-content:center; align-items:center; gap:16px; padding:20px; overflow-y:auto; }
   #scr-result h2 { font-size:30px; font-weight:900; letter-spacing:-.02em; }
   #result-card { background:#fff; color:var(--text-strong); border-radius:var(--r-xl); width:100%; max-width:440px; padding:28px; text-align:center; box-shadow:var(--shadow-pop); }
-  #result-card .rc-grade { display:inline-flex; min-width:120px; height:120px; padding:0 18px; font-size:44px; margin-bottom:16px; }
+  #result-card .rc-grade { width:130px; height:130px; margin:0 auto 14px; }
   #result-card .rc-img { width:240px; height:240px; border-radius:var(--r-md); object-fit:contain; background:var(--prize-well); font-size:110px; margin:0 auto 14px; }
   #result-card .rc-name { font-size:34px; font-weight:800; line-height:1.35; word-break:keep-all; }
   #result-card .rc-ip { font-size:20px; color:var(--text-muted); margin-top:8px; }
@@ -324,13 +321,13 @@
     .ip-card .ipinfo h3 { font-size:30px; }
     .ip-card .ipinfo .stock { font-size:18px; } .ip-card .ipinfo .stock b { font-size:30px; }
     .ip-card::after { width:52px; height:52px; font-size:30px; right:20px; }
-    #prize-grid { padding:22px; gap:14px; }
-    .prize-cell { padding:16px 20px 16px 14px; gap:20px; }
-    .prize-cell .grade { width:94px; height:94px; font-size:29px; }
-    .prize-cell.lucky .grade { font-size:20px; }
-    .prize-cell .p-img { width:140px; height:140px; }
-    .prize-cell .p-name { font-size:21px; }
-    .prize-cell .p-stock { font-size:15px; } .prize-cell .p-stock b { font-size:21px; }
+    #prize-grid { padding:24px 22px; gap:20px; }
+    .prize-cell { padding:16px 16px 16px 18px; gap:16px; min-height:210px; }
+    .prize-cell .grade { width:96px; height:96px; }
+    .prize-cell .p-body { padding:16px 18px; gap:10px; }
+    .prize-cell .p-name { font-size:22px; }
+    .prize-cell .p-meta { font-size:16px; } .prize-cell .p-meta b { font-size:27px; } .prize-cell .p-meta .tk-chip { width:28px; height:19px; }
+    .prize-cell .p-sub { font-size:16px; }
     .ticket-gauge i { width:15px; height:19px; }
     .lineup-footer { padding:18px 0 26px; }
     .lineup-footer .hint { font-size:16px; margin-bottom:16px; }
@@ -338,14 +335,14 @@
     #draw-box .npc-art { width:420px; height:420px; font-size:165px; }
     #draw-box .draw-msg { font-size:23px; }
     #reveal-card { width:360px; min-height:470px; padding:30px; gap:20px; }
-    #reveal-card .r-grade { width:116px; height:116px; font-size:40px; }
+    #reveal-card .r-grade { width:128px; height:128px; }
     #reveal-card .r-img { width:180px; height:180px; font-size:86px; }
     #reveal-card .r-name { font-size:23px; }
     #reveal-sub { font-size:19px; }
     #scr-result { gap:24px; }
     #scr-result h2 { font-size:46px; }
     #result-card { max-width:700px; padding:46px; }
-    #result-card .rc-grade { min-width:190px; height:190px; font-size:66px; margin-bottom:22px; }
+    #result-card .rc-grade { width:200px; height:200px; margin:0 auto 20px; }
     #result-card .rc-img { width:380px; height:380px; font-size:150px; }
     #result-card .rc-name { font-size:56px; }
     #result-card .rc-ip { font-size:34px; }
@@ -653,7 +650,7 @@ function renderLineup(){
       ${imgTag(p.imageKey,'p-img', gradeEmoji(p.tier))}
       <div class="p-body">
         <div class="p-name">${esc(p.name)}</div>
-        <div class="p-stock">잔여 <b>${left}</b> / ${p.count}</div>
+        <div class="p-meta"><span class="tk-chip"></span>잔여 <b class="${left<=1?'low':''}">${left}</b><span class="tot">/ ${p.count}</span></div>
         <div class="ticket-gauge">${g}</div>
       </div>`;
     grid.appendChild(cell);
@@ -662,7 +659,7 @@ function renderLineup(){
   if(curIp.lastOne && curIp.lastOne.name){
     const lo=document.createElement('div'); lo.className='prize-cell lucky';
     lo.innerHTML=`<div class="grade" data-tone="lucky">행운상</div>${imgTag(curIp.lastOne.imageKey,'p-img','🍀')}
-      <div class="p-body"><div class="p-name">${esc(curIp.lastOne.name)}</div><div class="p-stock" style="color:#8a6d00">행운상 · 각 등급 마지막 1개</div></div>`;
+      <div class="p-body"><div class="p-name">${esc(curIp.lastOne.name)}</div><div class="p-sub">행운상 · 각 등급 마지막 1개</div></div>`;
     grid.appendChild(lo);
   }
   const btn=document.getElementById('draw-start-btn'); btn.disabled = remain===0;

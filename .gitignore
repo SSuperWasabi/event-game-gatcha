@@ -15,3 +15,6 @@ Lucky Draw Event Design System.zip
 
 # 폰트 원본 폴더(다운로드 원본) — 앱이 쓰는 폰트는 kuji-app/assets/fonts/로 복사됨
 /fonts/
+
+# 뱃지 레퍼런스 원본 — 최종 뱃지는 kuji-app/assets/badges/로 베이크되어 커밋됨
+/badges/
