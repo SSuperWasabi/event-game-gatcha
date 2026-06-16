@@ -18,3 +18,9 @@ Lucky Draw Event Design System.zip
 
 # 뱃지 레퍼런스 원본 — 최종 뱃지는 kuji-app/assets/badges/로 베이크되어 커밋됨
 /badges/
+
+# 프레임 레퍼런스 원본 — 앱이 쓰는 프레임은 kuji-app/assets/frames/로 복사됨
+/frames/
+
+# 압축 원본(대용량)
+*.zip
