@@ -565,8 +565,11 @@ let idb=null;
 function openIDB(){ return new Promise((res)=>{ const rq=indexedDB.open('kuji-media',1);
   rq.onupgradeneeded=()=>{ rq.result.createObjectStore('media'); };
   rq.onsuccess=()=>{ idb=rq.result; res(idb); }; rq.onerror=()=>res(null); }); }
-function idbPut(key,val){ return new Promise((res)=>{ if(!idb)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').put(val,key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
+function idbPut(key,val){ return new Promise((res)=>{ try{ if(!idb)return res(false); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); tx.onabort=()=>res(false); }catch(e){ res(false); } }); }
 function idbGet(key){ return new Promise((res)=>{ if(!idb||!key)return res(null); const tx=idb.transaction('media','readonly'); const rq=tx.objectStore('media').get(key); rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>res(null); }); }
+/* iOS 안전: 미디어(영상·BGM·효과음·NPC)는 ArrayBuffer로 저장하고 읽을 때 Blob 재구성. iOS Safari/PWA의 IndexedDB Blob 저장·재생 결함 회피 */
+function fileToArrayBuffer(f){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.onerror=()=>r(null); fr.readAsArrayBuffer(f); }); }
+function mediaBlob(v){ if(!v) return null; if(v instanceof Blob) return v; if(v.buf){ try{ return new Blob([v.buf],{type:v.type||'application/octet-stream'}); }catch(e){ return null; } } return null; }
 function idbDel(key){ return new Promise((res)=>{ if(!idb||!key)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
 
 /* 이미지 캐시(dataURL) — 부팅 시 config가 참조하는 모든 키 로드 */
@@ -619,7 +622,7 @@ async function playIdleVideo(){
     lastIdleVideoId=pick.id;
     blob=await idbGet('idlevid_'+pick.id);
   }
-  if(blob){ try{ const src=(typeof blob==='string')?blob:(v._ourl=URL.createObjectURL(blob)); v.src=src; v.style.display='block'; v.play().catch(()=>{}); }catch(e){ v.style.display='none'; } }
+  if(blob){ try{ let src; if(typeof blob==='string'){ src=blob; } else { const b=mediaBlob(blob); if(!b) throw 0; src=v._ourl=URL.createObjectURL(b); } v.src=src; v.style.display='block'; v.play().catch(()=>{}); }catch(e){ v.style.display='none'; } }
   else { v.removeAttribute('src'); v.style.display='none'; }
 }
 async function bootIdle(){
@@ -720,8 +723,9 @@ async function renderDrawBox(){
   const pick=pool[Math.floor(Math.random()*pool.length)];
   lastNpcId=pick.id;
   const blob=await idbGet('npc_'+pick.id);
-  if(!blob){ el.innerHTML='🎴'; return; }
-  const url=(el._ourl=URL.createObjectURL(blob));
+  const nb=(typeof blob==='string')?dataURLtoBlob(blob):mediaBlob(blob);
+  if(!nb){ el.innerHTML='🎴'; return; }
+  const url=(el._ourl=URL.createObjectURL(nb));
   el.innerHTML = pick.type==='video'
     ? `<video src="${url}" muted loop playsinline autoplay></video>`
     : `<img src="${url}" alt="">`;
@@ -806,7 +810,7 @@ let actx=null; function audioCtx(){ if(!actx){ try{ actx=new (window.AudioContex
 function tone(freq,dur,type,vol,delay){ const c=audioCtx(); if(!c||cfg.muted)return; const t=c.currentTime+(delay||0); const o=c.createOscillator(),g=c.createGain(); o.type=type||'sine'; o.frequency.value=freq; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.2,t+.01); g.gain.exponentialRampToValueAtTime(.001,t+dur); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur); }
 /* 효과음: 업로드 파일 우선, 없으면 기본 합성음(WebAudio) 폴백 */
 const sfxEl={ pick:new Audio(), win:new Audio(), special:new Audio() }; const sfxUrls={};
-async function loadSfx(){ for(const k of ['pick','win','special']){ const d=await idbGet('sfx_'+k); if(d){ if(sfxUrls[k]){try{URL.revokeObjectURL(sfxUrls[k]);}catch(e){}} sfxEl[k].src=(typeof d==='string')?d:(sfxUrls[k]=URL.createObjectURL(d)); } } }
+async function loadSfx(){ for(const k of ['pick','win','special']){ const d=await idbGet('sfx_'+k); if(!d)continue; if(sfxUrls[k]){try{URL.revokeObjectURL(sfxUrls[k]);}catch(e){}} if(typeof d==='string'){ sfxEl[k].src=d; } else { const b=mediaBlob(d); if(b) sfxEl[k].src=sfxUrls[k]=URL.createObjectURL(b); } } }
 function playSfx(kind){
   if(cfg.muted)return;
   const slot={pick:'pick',win:'win',fanfare:'special'}[kind];
@@ -819,7 +823,7 @@ function playSfx(kind){
 }
 /* BGM: 화면별 3슬롯 (대기 / 선택 / 뽑기), 루핑 */
 const bgmEl={ idle:new Audio(), select:new Audio(), play:new Audio() }; Object.values(bgmEl).forEach(a=>a.loop=true); let curBgm=null; const bgmUrls={};
-async function loadBgm(){ for(const slot of ['idle','select','play']){ const d=await idbGet('bgm_'+slot); if(d){ if(bgmUrls[slot]){try{URL.revokeObjectURL(bgmUrls[slot]);}catch(e){}} bgmEl[slot].src=(typeof d==='string')?d:(bgmUrls[slot]=URL.createObjectURL(d)); } } }
+async function loadBgm(){ for(const slot of ['idle','select','play']){ const d=await idbGet('bgm_'+slot); if(!d)continue; if(bgmUrls[slot]){try{URL.revokeObjectURL(bgmUrls[slot]);}catch(e){}} if(typeof d==='string'){ bgmEl[slot].src=d; } else { const b=mediaBlob(d); if(b) bgmEl[slot].src=bgmUrls[slot]=URL.createObjectURL(b); } } }
 function startBgm(slot){ if(curBgm&&curBgm!==slot){ try{bgmEl[curBgm].pause();}catch(e){} } curBgm=slot; if(cfg.muted)return; const a=bgmEl[slot]; if(a&&a.src){ a.volume=.4; a.play().catch(()=>{}); } }
 function applyMute(){ if(cfg.muted){ Object.values(bgmEl).forEach(a=>{try{a.pause();}catch(e){}});} else if(curBgm){ startBgm(curBgm); } }
 
@@ -1010,8 +1014,10 @@ async function uploadMedia(key,accept){
   const isAudio = key.startsWith('bgm_') || key.startsWith('sfx_');
   const cap = isVid?150:(isAudio?30:8);
   if(f.size>cap*1024*1024){ toast(`${cap}MB 이하만 가능`); return; }
-  if(isVid || isAudio){ // 대용량 → Blob 원본 저장
-    await idbPut(key, f);
+  if(isVid || isAudio){ // iOS 안전: ArrayBuffer로 저장
+    const buf=await fileToArrayBuffer(f); if(!buf){ toast('파일 읽기 실패'); return; }
+    const ok=await idbPut(key, {buf, type:f.type||(isVid?'video/mp4':'audio/mpeg')});
+    if(!ok){ toast('저장 실패 — 용량 초과/브라우저 제한'); return; }
     if(isVid) await bootIdle();
     else if(key.startsWith('bgm_')) await loadBgm();
     else await loadSfx();
@@ -1027,7 +1033,8 @@ async function addNpc(accept,type){
   const cap=type==='video'?60:8;
   if(f.size>cap*1024*1024){ toast(`${cap}MB 이하만 가능`); return; }
   const id='n'+Date.now()+Math.floor(Math.random()*1000);
-  await idbPut('npc_'+id, f);
+  const buf=await fileToArrayBuffer(f); if(!buf){ toast('파일 읽기 실패'); return; }
+  if(!await idbPut('npc_'+id, {buf, type:f.type||(type==='video'?'video/mp4':'image/png')})){ toast('저장 실패 — 용량/브라우저 제한'); return; }
   if(!Array.isArray(cfg.npcs)) cfg.npcs=[];
   cfg.npcs.push({id,type}); saveCfg();
   toast('NPC 추가됨'); renderAdmSettings();
@@ -1039,7 +1046,8 @@ async function addIdleVideo(){
   const f=await pickFile('video/*'); if(!f)return;
   if(f.size>150*1024*1024){ toast('150MB 이하만 가능'); return; }
   const id='iv'+Date.now()+Math.floor(Math.random()*1000);
-  await idbPut('idlevid_'+id, f);
+  const buf=await fileToArrayBuffer(f); if(!buf){ toast('파일 읽기 실패'); return; }
+  if(!await idbPut('idlevid_'+id, {buf, type:f.type||'video/mp4'})){ toast('저장 실패 — 용량/브라우저 제한'); return; }
   if(!Array.isArray(cfg.idleVideos)) cfg.idleVideos=[];
   cfg.idleVideos.push({id}); saveCfg();
   toast('대기영상 추가됨'); renderAdmSettings();
