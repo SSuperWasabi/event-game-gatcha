@@ -430,7 +430,7 @@
       <div id="draw-box">
         <div class="npc-art">
           <div class="npc-media img-fallback" id="draw-npc">🎴</div>
-          <img class="npc-frame" src="assets/frames/frame-normal.png" alt="">
+          <img class="npc-frame" src="assets/frames/frame-normal.png?v=2" alt="">
         </div>
         <div class="draw-msg">버튼을 누르면 한 장 뽑습니다!</div>
         <button class="btn btn-yellow" id="draw-go-btn" onclick="pickDraw()">뽑기!</button>
@@ -442,7 +442,7 @@
   <div class="screen" id="scr-reveal" onclick="afterReveal()">
     <div id="reveal-card">
       <div class="r-img img-fallback" id="r-img">🏆</div>
-      <img class="r-frame" id="r-frame" src="assets/frames/frame-purple-card.png" alt="">
+      <img class="r-frame" id="r-frame" src="assets/frames/frame-purple-card.png?v=2" alt="">
       <div class="r-grade" id="r-grade">A상</div>
       <div class="r-name" id="r-name"></div>
     </div>
@@ -454,7 +454,7 @@
     <h2>🎉 당첨을 축하합니다!</h2>
     <div id="result-card">
       <div class="rc-img img-fallback" id="rc-img">🏆</div>
-      <img class="rc-frame" id="rc-frame" src="assets/frames/frame-purple-card.png" alt="">
+      <img class="rc-frame" id="rc-frame" src="assets/frames/frame-purple-card.png?v=2" alt="">
       <div class="rc-grade" id="rc-grade">A상</div>
       <div class="rc-name" id="rc-name"></div>
       <div class="rc-ip" id="rc-ip"></div>
@@ -757,7 +757,7 @@ function showReveal(){
   const {prize, high, isLucky}=lastResult;
   const card=document.getElementById('reveal-card');
   card.classList.toggle('gold', high);  /* A·B·C·스페셜(상위) = 골드 프레임, 그 외 = 퍼플 */
-  document.getElementById('r-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png';
+  document.getElementById('r-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png?v=2';
   const rg=document.getElementById('r-grade'); rg.textContent=prize.grade; rg.dataset.tone=gradeTone(prize.grade);
   document.getElementById('r-img').outerHTML = imgTag(prize.imageKey,'r-img', gradeEmoji(prize.tier)).replace('class="','id="r-img" class="');
   document.getElementById('r-name').textContent=prize.name;
@@ -770,7 +770,7 @@ function afterReveal(){ renderResult(); go('scr-result'); }
 /* ════════════════ S6 결과 ════════════════ */
 function renderResult(){
   const {ip, prize, isLucky, serial, high}=lastResult;
-  document.getElementById('rc-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png';
+  document.getElementById('rc-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png?v=2';
   const rcg=document.getElementById('rc-grade'); rcg.textContent=prize.grade; rcg.dataset.tone=gradeTone(prize.grade);
   document.getElementById('rc-img').outerHTML = imgTag(prize.imageKey,'rc-img', gradeEmoji(prize.tier)).replace('class="','id="rc-img" class="');
   document.getElementById('rc-name').textContent=prize.name;
