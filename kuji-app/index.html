@@ -309,9 +309,16 @@
   table.adm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
   table.adm-tbl th, table.adm-tbl td { border-bottom:1px solid #332a5e; padding:7px 5px; text-align:left; }
   table.adm-tbl th { color:var(--gold-400); }
-  .prize-edit-row { display:grid; grid-template-columns:40px 46px 1fr 46px 48px 44px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .prize-edit-row { display:grid; grid-template-columns:40px 46px 1fr 46px 48px 44px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
   .prize-edit-row input, .prize-edit-row select { padding:6px; border-radius:6px; border:1px solid #443a6e; background:var(--purple-950); color:#fff; font-size:12.5px; width:100%; }
   .prize-edit-row .del { background:var(--brand-red); color:#fff; border:none; border-radius:6px; height:32px; cursor:pointer; }
+  .prize-edit-row .bdl-on { background:var(--grad-gold,#caa24a); color:#2a1d05; border:none; }
+  .bundle-block { margin:0 0 10px 22px; padding:8px 10px; border-left:2px solid #6b5bd6; background:rgba(107,91,214,.10); border-radius:8px; }
+  .bundle-block .sub-row { display:grid; grid-template-columns:24px 1fr 56px 48px 44px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .bundle-block .sub-row input { padding:6px; border-radius:6px; border:1px solid #443a6e; background:var(--purple-950); color:#fff; font-size:12.5px; width:100%; }
+  .bundle-block .sub-row .sub-idx { font-size:11px; color:#9b8fd6; text-align:center; }
+  .bundle-block .sub-row .del { background:var(--brand-red); color:#fff; border:none; border-radius:6px; height:30px; cursor:pointer; }
+  .bundle-block .adm-btn { padding:6px 2px; font-size:11px; }
   .muted-note { font-size:11px; color:#9088b3; margin-top:4px; }
   .toast { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); background:#000d; color:#fff; padding:10px 20px; border-radius:999px; font-size:14px; z-index:99; opacity:0; transition:opacity .3s; pointer-events:none; }
   .toast.show { opacity:1; }
@@ -537,7 +544,13 @@ function defaultConfig(){
 let cfg = loadCfg(), stock = loadStock(), logArr = loadLog();
 function loadCfg(){ try{ const r=localStorage.getItem(K_CFG); if(r) return JSON.parse(r);}catch(e){} return defaultConfig(); }
 function saveCfg(){ try{ localStorage.setItem(K_CFG, JSON.stringify(cfg)); }catch(e){} }
-function freshStock(){ const s={}; cfg.ips.forEach(ip=> s[ip.id]=ip.prizes.map(p=>+p.count||0)); return s; }
+/* 번들 상품: prize.bundle=true & prize.subs=[{name,imageKey,count}]. 재고 칸은 단순=숫자, 번들=하위별 배열 */
+function isBundle(p){ return !!(p && p.bundle && Array.isArray(p.subs) && p.subs.length); }
+function prizeFreshStock(p){ return isBundle(p) ? p.subs.map(s=>+s.count||0) : (+p.count||0); }
+function cellRemain(cell){ return Array.isArray(cell) ? cell.reduce((a,b)=>a+(+b||0),0) : (+cell||0); }
+function prizeRemain(ip,i){ const arr=stock[ip.id]; return arr ? cellRemain(arr[i]) : 0; }
+function prizeTotal(p){ return isBundle(p) ? p.subs.reduce((a,s)=>a+(+s.count||0),0) : (+p.count||0); }
+function freshStock(){ const s={}; cfg.ips.forEach(ip=> s[ip.id]=ip.prizes.map(prizeFreshStock)); return s; }
 function loadStock(){
   try{ const r=localStorage.getItem(K_STOCK); if(r){ const s=JSON.parse(r); return s; } }catch(e){}
   return freshStock();
@@ -550,14 +563,21 @@ function reconcileStock(){
   let changed=false;
   cfg.ips.forEach(ip=>{
     if(!Array.isArray(stock[ip.id]) || stock[ip.id].length!==ip.prizes.length){
-      stock[ip.id]=ip.prizes.map(p=>+p.count||0); changed=true;
+      stock[ip.id]=ip.prizes.map(prizeFreshStock); changed=true;
+    } else {
+      /* 각 칸 모양(번들 배열↔숫자, 하위 길이) 보정 */
+      ip.prizes.forEach((p,i)=>{
+        const cell=stock[ip.id][i];
+        if(isBundle(p)){ if(!Array.isArray(cell)||cell.length!==p.subs.length){ stock[ip.id][i]=prizeFreshStock(p); changed=true; } }
+        else { if(typeof cell!=='number'){ stock[ip.id][i]=prizeFreshStock(p); changed=true; } }
+      });
     }
   });
   Object.keys(stock).forEach(id=>{ if(!cfg.ips.find(ip=>ip.id===id)){ delete stock[id]; changed=true; } });
   if(changed) saveStock();
 }
-function remainOf(ip){ return (stock[ip.id]||[]).reduce((a,b)=>a+b,0); }
-function totalOf(ip){ return ip.prizes.reduce((a,p)=>a+(+p.count||0),0); }
+function remainOf(ip){ return (stock[ip.id]||[]).reduce((a,b)=>a+cellRemain(b),0); }
+function totalOf(ip){ return ip.prizes.reduce((a,p)=>a+prizeTotal(p),0); }
 function totalRemainAll(){ return cfg.ips.reduce((a,ip)=>a+remainOf(ip),0); }
 
 /* ════════════════ IndexedDB 이미지/미디어 저장 ════════════════ */
@@ -672,10 +692,10 @@ function renderLineup(){
   document.getElementById('lineup-title').innerHTML=`${esc(curIp.name)} <em>잔여 ${remain}/${total}</em>`;
   const grid=document.getElementById('prize-grid'); grid.innerHTML='';
   curIp.prizes.forEach((p,i)=>{
-    const left=stock[curIp.id][i], out=left===0;
+    const left=prizeRemain(curIp,i), tot=prizeTotal(p), out=left===0;
     let g='';
     const onCount=Math.min(left,10);
-    for(let k=0;k<Math.min(p.count,10);k++) g+=`<i class="${k<onCount?'on':''}"></i>`;
+    for(let k=0;k<Math.min(tot,10);k++) g+=`<i class="${k<onCount?'on':''}"></i>`;
     const cell=document.createElement('div');
     cell.className='prize-cell'+(out?' out':'');
     cell.innerHTML=`
@@ -684,7 +704,7 @@ function renderLineup(){
       ${imgTag(p.imageKey,'p-img', gradeEmoji(p.tier))}
       <div class="p-body">
         <div class="p-name">${esc(p.name)}</div>
-        <div class="p-meta"><span class="tk-chip"></span>잔여 <b class="${left<=1?'low':''}">${left}</b><span class="tot">/ ${p.count}</span></div>
+        <div class="p-meta"><span class="tk-chip"></span>잔여 <b class="${left<=1?'low':''}">${left}</b><span class="tot">/ ${tot}</span></div>
         <div class="ticket-gauge">${g}</div>
       </div>`;
     grid.appendChild(cell);
@@ -736,17 +756,26 @@ function pickDraw(){
   drawing=true;
   const btn=document.getElementById('draw-go-btn'); if(btn) btn.disabled=true;
   playSfx('pick');
-  // 비복원 추첨 (랜덤·100% 당첨)
+  // 비복원 추첨 (랜덤·100% 당첨) — 번들은 하위까지 평탄화하여 재고 비례로 추첨
   const arr=stock[curIp.id]; const pool=[];
-  arr.forEach((c,i)=>{ for(let k=0;k<c;k++) pool.push(i); });
-  const idx=pool[Math.floor(Math.random()*pool.length)];
-  arr[idx]--; saveStock();
+  arr.forEach((cell,i)=>{
+    if(Array.isArray(cell)){ cell.forEach((c,j)=>{ for(let k=0;k<c;k++) pool.push({i,sub:j}); }); }
+    else { for(let k=0;k<cell;k++) pool.push({i,sub:null}); }
+  });
+  const hit=pool[Math.floor(Math.random()*pool.length)];
+  const idx=hit.i, sub=hit.sub;
+  if(sub==null) arr[idx]--; else arr[idx][sub]--;
+  saveStock();
   const prize=curIp.prizes[idx];
-  // 행운상: 이 등급의 마지막 1개를 뽑은 경우 (스토어 할인 쿠폰 현장 지급)
-  const isLucky = arr[idx]===0 && !!(curIp.lastOne && curIp.lastOne.name);
+  // 번들이면 실제 받은 하위상품으로 표시 정보 구성
+  const won = (sub!=null && isBundle(prize)) ? prize.subs[sub] : null;
+  const wonName = won ? won.name : prize.name;
+  const wonImageKey = won ? won.imageKey : prize.imageKey;
+  // 행운상: 이 등급(번들이면 전체 하위 합계)의 마지막 1개를 뽑은 경우 (스토어 할인 쿠폰 현장 지급)
+  const isLucky = cellRemain(arr[idx])===0 && !!(curIp.lastOne && curIp.lastOne.name);
   const serial = nextSerial();
-  logArr.push({ timestamp:new Date().toISOString(), ipId:curIp.id, ipName:curIp.name, grade:prize.grade, prizeName:prize.name, isLastOne:isLucky, luckyGrade:isLucky?prize.grade:'', serial }); saveLog();
-  lastResult={ ip:curIp, prize, isLucky, serial, high:(prize.tier==='high') };
+  logArr.push({ timestamp:new Date().toISOString(), ipId:curIp.id, ipName:curIp.name, grade:prize.grade, prizeName: won ? (prize.name+' - '+won.name) : prize.name, isLastOne:isLucky, luckyGrade:isLucky?prize.grade:'', serial }); saveLog();
+  lastResult={ ip:curIp, prize, isLucky, serial, high:(prize.tier==='high'), wonName, wonImageKey };
   setTimeout(()=>showReveal(), 360);
 }
 function nextSerial(){
@@ -758,13 +787,13 @@ function dateKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(
 
 /* ════════════════ S5 당첨 연출 ════════════════ */
 function showReveal(){
-  const {prize, high, isLucky}=lastResult;
+  const {prize, high, isLucky, wonName, wonImageKey}=lastResult;
   const card=document.getElementById('reveal-card');
   card.classList.toggle('gold', high);  /* A·B·C·스페셜(상위) = 골드 프레임, 그 외 = 퍼플 */
   document.getElementById('r-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png?v=2';
   const rg=document.getElementById('r-grade'); rg.textContent=prize.grade; rg.dataset.tone=gradeTone(prize.grade);
-  document.getElementById('r-img').outerHTML = imgTag(prize.imageKey,'r-img', gradeEmoji(prize.tier)).replace('class="','id="r-img" class="');
-  document.getElementById('r-name').textContent=prize.name;
+  document.getElementById('r-img').outerHTML = imgTag(wonImageKey!=null?wonImageKey:prize.imageKey,'r-img', gradeEmoji(prize.tier)).replace('class="','id="r-img" class="');
+  document.getElementById('r-name').textContent = wonName!=null?wonName:prize.name;
   document.getElementById('reveal-sub').textContent = isLucky ? '🍀 행운상! 스토어 할인 쿠폰도 함께! (터치)' : '화면을 터치하면 계속합니다.';
   go('scr-reveal');
   if(high || isLucky) specialFx(); else playSfx('win');
@@ -773,11 +802,11 @@ function afterReveal(){ renderResult(); go('scr-result'); }
 
 /* ════════════════ S6 결과 ════════════════ */
 function renderResult(){
-  const {ip, prize, isLucky, serial, high}=lastResult;
+  const {ip, prize, isLucky, serial, high, wonName, wonImageKey}=lastResult;
   document.getElementById('rc-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png?v=2';
   const rcg=document.getElementById('rc-grade'); rcg.textContent=prize.grade; rcg.dataset.tone=gradeTone(prize.grade);
-  document.getElementById('rc-img').outerHTML = imgTag(prize.imageKey,'rc-img', gradeEmoji(prize.tier)).replace('class="','id="rc-img" class="');
-  document.getElementById('rc-name').textContent=prize.name;
+  document.getElementById('rc-img').outerHTML = imgTag(wonImageKey!=null?wonImageKey:prize.imageKey,'rc-img', gradeEmoji(prize.tier)).replace('class="','id="rc-img" class="');
+  document.getElementById('rc-name').textContent = wonName!=null?wonName:prize.name;
   document.getElementById('rc-ip').textContent=ip.name;
   const lo=document.getElementById('result-lastone');
   if(isLucky){ lo.style.display='block'; document.getElementById('rl-name').textContent=ip.lastOne.name; document.getElementById('result-card').classList.add('lastone-extra'); }
@@ -847,21 +876,43 @@ function renderAdmIps(){
     const card=document.createElement('div'); card.className='adm-card';
     let prizeRows='';
     ip.prizes.forEach((p,pi)=>{
+      const bundled=isBundle(p);
       prizeRows+=`<div class="prize-edit-row">
         <input value="${escAttr(p.grade)}" onchange="admEditPrize(${ii},${pi},'grade',this.value)" placeholder="등급">
         <select onchange="admEditPrize(${ii},${pi},'tier',this.value)"><option value="normal"${p.tier!=='high'?' selected':''}>일반</option><option value="high"${p.tier==='high'?' selected':''}>상위</option></select>
-        <input value="${escAttr(p.name)}" onchange="admEditPrize(${ii},${pi},'name',this.value)" placeholder="경품명">
-        <input type="number" min="0" value="${p.count}" onchange="admEditPrize(${ii},${pi},'count',this.value)">
+        <input value="${escAttr(p.name)}" onchange="admEditPrize(${ii},${pi},'name',this.value)" placeholder="${bundled?'번들명 (예: 가디언스클럽 랜덤)':'경품명'}">
+        ${bundled
+          ? `<input type="number" value="${prizeTotal(p)}" title="하위 수량 합계(자동)" disabled style="opacity:.55">`
+          : `<input type="number" min="0" value="${p.count}" onchange="admEditPrize(${ii},${pi},'count',this.value)">`}
         <button class="adm-btn sec" onclick="admPickImg(${ii},${pi})">이미지</button>
         <button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].prizes[${pi}].imageKey,'prize')">조정</button>
+        <button class="adm-btn sec ${bundled?'bdl-on':''}" onclick="admToggleBundle(${ii},${pi})" title="여러 하위상품을 묶어 당첨 시 랜덤 1개 지급">${bundled?'번들✓':'번들'}</button>
         <button class="del" onclick="admDelPrize(${ii},${pi})">×</button>
       </div>`;
+      if(bundled){
+        let subRows='';
+        p.subs.forEach((s,si)=>{
+          subRows+=`<div class="sub-row">
+            <span class="sub-idx">${si+1}</span>
+            <input value="${escAttr(s.name)}" onchange="admEditSub(${ii},${pi},${si},'name',this.value)" placeholder="하위 경품명">
+            <input type="number" min="0" value="${s.count}" onchange="admEditSub(${ii},${pi},${si},'count',this.value)">
+            <button class="adm-btn sec" onclick="admPickSubImg(${ii},${pi},${si})">이미지</button>
+            <button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].prizes[${pi}].subs[${si}]||{}).imageKey,'prize')">조정</button>
+            <button class="del" onclick="admDelSub(${ii},${pi},${si})">×</button>
+          </div>`;
+        });
+        prizeRows+=`<div class="bundle-block">
+          ${subRows}
+          <button class="adm-btn sec" onclick="admAddSub(${ii},${pi})">+ 하위상품 추가</button>
+          <div class="muted-note">당첨 시 하위상품 중 재고 비례 무작위 1개 지급 · 대표이미지는 위 행 '이미지'</div>
+        </div>`;
+      }
     });
     card.innerHTML=`
       <h4>IP ${ii+1} <button class="adm-btn dng" style="float:right" onclick="admDelIp(${ii})">IP 삭제</button></h4>
       <div class="adm-row"><label>IP명</label><input value="${escAttr(ip.name)}" onchange="admEditIp(${ii},'name',this.value)"></div>
       <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].heroImageKey,'ipcard')">조정</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
-      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">등급 / 상위·일반 / 경품명 / 수량 / 이미지</div>
+      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">등급 / 상위·일반 / 경품명 / 수량 / 이미지 / 조정 / 번들</div>
       ${prizeRows}
       <button class="adm-btn sec" onclick="admAddPrize(${ii})">+ 등급 추가</button>
       <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button><button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].lastOne||{}).imageKey,'lucky')">조정</button></div>
@@ -877,6 +928,21 @@ function admEditPrize(i,pi,f,v){ cfg.ips[i].prizes[pi][f] = f==='count'? (Math.m
 function admEditLastOne(i,v){ if(!cfg.ips[i].lastOne) cfg.ips[i].lastOne={name:'',imageKey:null}; cfg.ips[i].lastOne.name=v; }
 function admAddPrize(i){ cfg.ips[i].prizes.push({grade:'',name:'',imageKey:null,count:1,tier:'normal'}); renderAdmIps(); }
 function admDelPrize(i,pi){ cfg.ips[i].prizes.splice(pi,1); renderAdmIps(); }
+/* ── 번들 상품 편집 ── */
+function admToggleBundle(i,pi){
+  const p=cfg.ips[i].prizes[pi];
+  if(isBundle(p)){ // 번들 해제 → 단순상품으로 (하위는 버림, 합계를 count로)
+    if(!confirm('번들을 해제하면 하위상품 목록이 삭제됩니다. 계속할까요?')) return;
+    p.count=prizeTotal(p); delete p.bundle; delete p.subs;
+  } else { // 번들 전환 → 첫 하위상품 1개로 시작(기존 이미지는 대표이미지로 유지)
+    p.bundle=true; p.subs=[{name:'',imageKey:null,count:Math.max(1,+p.count||1)}];
+  }
+  renderAdmIps();
+}
+function admAddSub(i,pi){ const p=cfg.ips[i].prizes[pi]; if(!Array.isArray(p.subs))p.subs=[]; p.subs.push({name:'',imageKey:null,count:1}); renderAdmIps(); }
+function admDelSub(i,pi,si){ const p=cfg.ips[i].prizes[pi]; p.subs.splice(si,1); if(!p.subs.length){ delete p.bundle; delete p.subs; p.count=p.count||1; } renderAdmIps(); }
+function admEditSub(i,pi,si,f,v){ const s=cfg.ips[i].prizes[pi].subs[si]; s[f]= f==='count'? (Math.max(0,parseInt(v)||0)) : v; if(f==='count') renderAdmIps(); }
+async function admPickSubImg(i,pi,si){ const key='img_'+cfg.ips[i].id+'_p'+pi+'s'+si+'_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].prizes[pi].subs[si].imageKey=k; toast('하위 이미지 적용됨 (저장 잊지 마세요)'); renderAdmIps(); } }
 function admAddIp(){ if(cfg.ips.length>=3)return; cfg.ips.push({id:'ip'+Date.now(),name:'새 IP',heroImageKey:null,lastOne:{name:'',imageKey:null},prizes:[{grade:'A상',name:'',imageKey:null,count:1,tier:'high'}]}); renderAdmIps(); }
 function admDelIp(i){ if(cfg.ips.length<=1){toast('최소 1개 IP가 필요합니다');return;} if(confirm('이 IP를 삭제할까요?')){ cfg.ips.splice(i,1); renderAdmIps(); } }
 /* 이미지 업로드 */
@@ -887,8 +953,8 @@ async function admPickImg(i,pi){ const key='img_'+cfg.ips[i].id+'_p'+pi+'_'+Date
 async function admPickHero(i){ const key='img_'+cfg.ips[i].id+'_hero_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].heroImageKey=k; renderAdmIps(); } }
 async function admPickLastOne(i){ if(!cfg.ips[i].lastOne)cfg.ips[i].lastOne={name:'',imageKey:null}; const key='img_'+cfg.ips[i].id+'_lo_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].lastOne.imageKey=k; renderAdmIps(); } }
 function admSaveCfg(){
-  // 빈 등급 정리
-  cfg.ips.forEach(ip=>{ ip.prizes=ip.prizes.filter(p=>p.grade||p.name); });
+  // 빈 등급 정리 (번들은 하위가 있으면 유지)
+  cfg.ips.forEach(ip=>{ ip.prizes=ip.prizes.filter(p=>p.grade||p.name||isBundle(p)); });
   saveCfg();
   if(confirm('설정을 저장했습니다.\n수량이 바뀌었다면 재고를 초기화해야 정확합니다.\n지금 재고를 초기화할까요? (당첨 로그는 유지)')){
     stock=freshStock(); saveStock();
@@ -901,7 +967,10 @@ function renderAdmStock(){
   const root=document.getElementById('pane-stock'); let html=`<div class="adm-card"><h4>전체 잔여: ${totalRemainAll()}장</h4>`;
   cfg.ips.forEach(ip=>{
     html+=`<div style="margin:10px 0 4px;font-weight:700">${esc(ip.name)} — 잔여 ${remainOf(ip)}/${totalOf(ip)}</div><table class="adm-tbl"><tr><th>등급</th><th>경품</th><th>잔여/초기</th></tr>`;
-    ip.prizes.forEach((p,i)=>{ html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}</td><td>${stock[ip.id]?stock[ip.id][i]:0} / ${p.count}</td></tr>`; });
+    ip.prizes.forEach((p,i)=>{
+      html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}${isBundle(p)?' <span style="color:#ffe14d">(번들)</span>':''}</td><td>${prizeRemain(ip,i)} / ${prizeTotal(p)}</td></tr>`;
+      if(isBundle(p)){ const cell=(stock[ip.id]||[])[i]||[]; p.subs.forEach((s,si)=>{ html+=`<tr><td></td><td style="padding-left:18px;color:#cfc3ff">└ ${esc(s.name||'(이름없음)')}</td><td>${(cell[si]??0)} / ${(+s.count||0)}</td></tr>`; }); }
+    });
     html+=`</table>`;
   });
   html+=`</div><button class="adm-btn dng" style="width:100%;padding:14px" onclick="admResetStock()">⚠️ 재고 전체 리셋</button>`;
