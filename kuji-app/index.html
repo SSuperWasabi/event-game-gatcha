@@ -1005,6 +1005,7 @@ function admClearLog(){ if(confirm('당첨 로그를 모두 삭제할까요? (CS
 
 /* ════════════════ 설정 백업/복원 (.kuji) ════════════════ */
 const KUJI_MAGIC='KUJI', KUJI_VER=1;
+function summarizeMedia(arr){ const c={img:0,audio:0,other:0}; (arr||[]).forEach(m=>{ if(m.kind==='image')c.img++; else if(/^(bgm_|sfx_)/.test(m.key))c.audio++; else c.other++; }); return c; }
 function dlBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },1500); }
 function backupName(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `kuji-backup-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.kuji`; }
 async function exportBackup(){
@@ -1030,6 +1031,8 @@ async function exportBackup(){
     new DataView(header.buffer).setUint32(4, mBytes.length, true);
     const blob=new Blob([header, mBytes, ...parts], {type:'application/octet-stream'});
     const name=backupName(), mb=(blob.size/1048576).toFixed(1);
+    const c=summarizeMedia(media);
+    alert(`내보낼 백업 내용\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}\n용량 ${mb}MB${c.audio===0?'\n\n⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}`);
     try{
       const file=new File([blob], name, {type:'application/octet-stream'});
       if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -1063,8 +1066,9 @@ async function importBackup(){
       if(m.kind==='image') await idbPut(m.key, dec.decode(slice));
       else await idbPut(m.key, { buf: slice.slice().buffer, type:m.type||'' });
     }
-    toast('복원 완료 — 새로고침합니다');
-    setTimeout(()=>location.reload(), 800);
+    const c=summarizeMedia(manifest.media||[]);
+    alert(`복원 완료\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}\n확인을 누르면 새로고침합니다.`);
+    location.reload();
   }catch(e){ toast('복원 실패: '+((e&&e.message)||e)); }
 }
 
