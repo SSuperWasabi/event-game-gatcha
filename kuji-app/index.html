@@ -591,6 +591,9 @@ function idbGet(key){ return new Promise((res)=>{ if(!idb||!key)return res(null)
 function fileToArrayBuffer(f){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.onerror=()=>r(null); fr.readAsArrayBuffer(f); }); }
 function mediaBlob(v){ if(!v) return null; if(v instanceof Blob) return v; if(v.buf){ try{ return new Blob([v.buf],{type:v.type||'application/octet-stream'}); }catch(e){ return null; } } return null; }
 function idbDel(key){ return new Promise((res)=>{ if(!idb||!key)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
+/* 백업용: 전체 항목 열거 / 스토어 비우기 */
+function idbAll(){ return new Promise((res)=>{ try{ if(!idb)return res([]); const tx=idb.transaction('media','readonly'); const st=tx.objectStore('media'); const out=[]; const rq=st.openCursor(); rq.onsuccess=()=>{ const c=rq.result; if(c){ out.push({key:c.key,value:c.value}); c.continue(); } else res(out); }; rq.onerror=()=>res(out); }catch(e){ res([]); } }); }
+function idbClear(){ return new Promise((res)=>{ try{ if(!idb)return res(false); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').clear(); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }catch(e){ res(false); } }); }
 
 /* 이미지 캐시(dataURL) — 부팅 시 config가 참조하는 모든 키 로드 */
 const imgCache={};
@@ -1000,6 +1003,71 @@ function exportCsv(){
 }
 function admClearLog(){ if(confirm('당첨 로그를 모두 삭제할까요? (CSV 백업 권장)')){ logArr=[]; saveLog(); toast('로그 삭제됨'); renderAdmLog(); } }
 
+/* ════════════════ 설정 백업/복원 (.kuji) ════════════════ */
+const KUJI_MAGIC='KUJI', KUJI_VER=1;
+function dlBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },1500); }
+function backupName(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `kuji-backup-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.kuji`; }
+async function exportBackup(){
+  try{
+    toast('백업 파일 생성 중…');
+    const enc=new TextEncoder();
+    const items=await idbAll();
+    const media=[], parts=[]; let off=0;
+    for(const {key,value} of items){
+      let bytes=null, kind, type='';
+      if(typeof value==='string'){ kind='image'; bytes=enc.encode(value); }
+      else if(value && value.buf){ kind='buf'; type=value.type||''; bytes=new Uint8Array(value.buf); }
+      else if(value instanceof Blob){ kind='buf'; type=value.type||''; bytes=new Uint8Array(await value.arrayBuffer()); }
+      else if(value instanceof ArrayBuffer){ kind='buf'; bytes=new Uint8Array(value); }
+      else continue;
+      media.push({ key:String(key), kind, type, off, len:bytes.length });
+      parts.push(bytes); off+=bytes.length;
+    }
+    const manifest={ v:KUJI_VER, app:'kuji', exportedAt:new Date().toISOString(),
+      ls:{ cfg:localStorage.getItem(K_CFG), stock:localStorage.getItem(K_STOCK), log:localStorage.getItem(K_LOG) }, media };
+    const mBytes=enc.encode(JSON.stringify(manifest));
+    const header=new Uint8Array(8); header.set(enc.encode(KUJI_MAGIC),0);
+    new DataView(header.buffer).setUint32(4, mBytes.length, true);
+    const blob=new Blob([header, mBytes, ...parts], {type:'application/octet-stream'});
+    const name=backupName(), mb=(blob.size/1048576).toFixed(1);
+    try{
+      const file=new File([blob], name, {type:'application/octet-stream'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({ files:[file], title:'쿠지 설정 백업' });
+        toast(`백업 공유 완료 (${mb}MB)`); return;
+      }
+    }catch(e){ if(e && e.name==='AbortError'){ toast('백업 취소됨'); return; } /* 공유 실패 → 다운로드 폴백 */ }
+    dlBlob(blob, name); toast(`백업 다운로드 (${mb}MB)`);
+  }catch(e){ toast('백업 실패: '+((e&&e.message)||e)); }
+}
+async function importBackup(){
+  const f=await pickFile(); if(!f) return;
+  if(!confirm('백업을 가져오면 현재 기기의 설정·이미지·BGM·영상이 모두 덮어써집니다.\n계속할까요?')) return;
+  if(!confirm('정말 복원할까요? (현재 데이터는 사라집니다)')) return;
+  try{
+    toast('복원 중… (영상이 크면 시간이 걸립니다)');
+    const buf=await fileToArrayBuffer(f); if(!buf) throw new Error('파일을 읽을 수 없습니다');
+    const u8=new Uint8Array(buf), dec=new TextDecoder();
+    if(dec.decode(u8.subarray(0,4))!==KUJI_MAGIC) throw new Error('쿠지 백업 파일이 아닙니다');
+    const mLen=new DataView(buf,4,4).getUint32(0,true);
+    const manifest=JSON.parse(dec.decode(u8.subarray(8,8+mLen)));
+    if(manifest.app!=='kuji') throw new Error('형식이 올바르지 않습니다');
+    if((manifest.v|0)>KUJI_VER) throw new Error('더 최신 버전 백업입니다. 앱을 업데이트하세요');
+    const base=8+mLen, ls=manifest.ls||{};
+    if(ls.cfg!=null) localStorage.setItem(K_CFG, ls.cfg);
+    if(ls.stock!=null) localStorage.setItem(K_STOCK, ls.stock);
+    if(ls.log!=null) localStorage.setItem(K_LOG, ls.log);
+    await idbClear();
+    for(const m of (manifest.media||[])){
+      const slice=u8.subarray(base+m.off, base+m.off+m.len);
+      if(m.kind==='image') await idbPut(m.key, dec.decode(slice));
+      else await idbPut(m.key, { buf: slice.slice().buffer, type:m.type||'' });
+    }
+    toast('복원 완료 — 새로고침합니다');
+    setTimeout(()=>location.reload(), 800);
+  }catch(e){ toast('복원 실패: '+((e&&e.message)||e)); }
+}
+
 /* 설정 */
 function renderAdmSettings(){
   const root=document.getElementById('pane-settings');
@@ -1037,6 +1105,13 @@ function renderAdmSettings(){
     <div class="adm-row"><label>일반당첨</label><button class="adm-btn sec" onclick="uploadMedia('sfx_win','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('sfx_win')">삭제</button></div>
     <div class="adm-row"><label>스페셜</label><button class="adm-btn sec" onclick="uploadMedia('sfx_special','audio/*')">업로드</button><button class="adm-btn dng" onclick="delMedia('sfx_special')">삭제</button></div>
     <div class="muted-note">스페셜 = A·B·C·행운상 당첨 시 금빛 번개 사운드. 업로드 안 하면 기본 합성음 사용</div>
+  </div>
+  <div class="adm-card"><h4>설정 백업 / 복원</h4>
+    <div class="adm-row" style="gap:10px">
+      <button class="adm-btn pri" style="flex:1" onclick="exportBackup()">📤 설정 내보내기</button>
+      <button class="adm-btn sec" style="flex:1" onclick="importBackup()">📥 설정 가져오기</button>
+    </div>
+    <div class="muted-note">현재 기기의 모든 설정·이미지·BGM·효과음·영상을 <b>.kuji 파일 1개</b>로 저장/복원. 새 기기 세팅·재설치·기기 교체 대비.<br>⚠️ <b>가져오기는 현재 데이터를 전부 덮어씁니다.</b> 영상이 많으면 파일이 크고 시간이 걸립니다. (아이패드는 공유시트로 파일앱·에어드랍 저장)</div>
   </div>`;
 }
 function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); saveCfg(); bootIdle(); toast('설정 저장됨'); }
