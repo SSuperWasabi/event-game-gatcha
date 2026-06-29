@@ -521,6 +521,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1';
+const APP_VER='v15';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -1118,7 +1119,8 @@ function renderAdmSettings(){
       <button class="adm-btn sec" style="flex:1" onclick="importBackup()">📥 설정 가져오기</button>
     </div>
     <div class="muted-note">현재 기기의 모든 설정·이미지·BGM·효과음·영상을 <b>.kuji 파일 1개</b>로 저장/복원. 새 기기 세팅·재설치·기기 교체 대비.<br>⚠️ <b>가져오기는 현재 데이터를 전부 덮어씁니다.</b> 영상이 많으면 파일이 크고 시간이 걸립니다. (아이패드는 공유시트로 파일앱·에어드랍 저장)</div>
-  </div>`;
+  </div>
+  <div class="muted-note" style="text-align:center;margin:14px 0 4px">앱 버전 <b>${APP_VER}</b></div>`;
 }
 function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); saveCfg(); bootIdle(); toast('설정 저장됨'); }
 async function admPickHeroBanner(){ const key='hero_banner_'+Date.now(); const k=await uploadImg(key); if(k){ if(cfg.heroBannerKey){try{await idbDel(cfg.heroBannerKey);}catch(e){}} cfg.heroBannerKey=k; saveCfg(); toast('히어로 배너 등록됨'); renderAdmSettings(); } }
