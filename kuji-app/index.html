@@ -417,7 +417,7 @@
   <!-- S3 경품 라인업 -->
   <div class="screen" id="scr-lineup">
     <div class="topbar">
-      <button class="back" onclick="go('scr-ip')">←</button>
+      <button class="back" onclick="lineupBack()">←</button>
       <div class="title" id="lineup-title"></div>
     </div>
     <div id="prize-grid"></div>
@@ -667,6 +667,8 @@ document.getElementById('scr-idle').addEventListener('click', e=>{
 
 /* ════════════════ S2 IP 선택 ════════════════ */
 function goIp(){ renderIp(); go('scr-ip'); }
+/* S3 뒤로가기: IP가 1개면 S2를 건너뛰었으므로 대기화면(S1)으로, 여러 개면 다시 렌더한 S2로 */
+function lineupBack(){ if(cfg.ips.length<=1){ resetToIdle(); } else { renderIp(); go('scr-ip'); } }
 async function renderIp(){
   // 상단 히어로 배경: 전용 배너 우선, 없으면 첫 IP 배너, 그것도 없으면 기본. 타이틀은 고정 마크업.
   const heroKey = cfg.heroBannerKey || (cfg.ips[0]&&cfg.ips[0].heroImageKey);
