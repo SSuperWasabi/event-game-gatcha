@@ -524,7 +524,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1';
-const APP_VER='v17';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v18';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -604,7 +604,7 @@ const imgCache={};
 async function loadAllImages(){
   const keys=new Set();
   if(cfg.heroBannerKey)keys.add(cfg.heroBannerKey);
-  cfg.ips.forEach(ip=>{ if(ip.heroImageKey)keys.add(ip.heroImageKey); if(ip.lastOne&&ip.lastOne.imageKey)keys.add(ip.lastOne.imageKey); ip.prizes.forEach(p=>{ if(p.imageKey)keys.add(p.imageKey); }); });
+  cfg.ips.forEach(ip=>{ if(ip.heroImageKey)keys.add(ip.heroImageKey); if(ip.lastOne&&ip.lastOne.imageKey)keys.add(ip.lastOne.imageKey); ip.prizes.forEach(p=>{ if(p.imageKey)keys.add(p.imageKey); if(isBundle(p)) p.subs.forEach(s=>{ if(s.imageKey)keys.add(s.imageKey); }); }); });
   for(const k of keys){ imgCache[k]=await idbGet(k); }
 }
 /* img 또는 fallback 마크업 */
