@@ -103,7 +103,7 @@
   /* 이미지 조정(위치/확대/크롭) — imgTag 래퍼가 클리핑, 안쪽 img에 transform 적용 */
   .imgadj-wrap { overflow:hidden; }
   .imgadj-wrap>img { width:100%; height:100%; display:block; object-fit:cover; }
-  .prize-cell .p-img>img, #reveal-card .r-img>img, #result-card .rc-img>img { object-fit:contain; }
+  .prize-cell .p-img>img, #result-card .rc-img>img { object-fit:contain; }
   #ip-hero-bg .imgadj-wrap { position:absolute; inset:0; }
   /* 조정 모달 */
   .adj-modal { position:absolute; inset:0; z-index:120; background:rgba(8,2,28,.78); display:flex; align-items:center; justify-content:center; padding:18px; }
@@ -119,7 +119,7 @@
   /* 관리자 프라이즈 행 버튼 컴팩트 */
   .prize-edit-row .adm-btn { padding:6px 2px; font-size:11px; }
   /* 등급 엠블럼 (공유) — AI 생성 메달 이미지(글자 베이크됨), data-tone으로 매핑 */
-  .grade,.r-grade,.rc-grade { background:center/contain no-repeat; font-size:0; color:transparent; border:none; box-shadow:none; }
+  .grade,.rc-grade { background:center/contain no-repeat; font-size:0; color:transparent; border:none; box-shadow:none; }
   [data-tone="a"]{background-image:url("assets/badges/badge-a.png")}
   [data-tone="b"]{background-image:url("assets/badges/badge-b.png")}
   [data-tone="c"]{background-image:url("assets/badges/badge-c.png")}
@@ -241,16 +241,8 @@
   .ticket.opening { animation:ticketOpen .5s forwards; }
   @keyframes ticketOpen { to{transform:scale(2.4);opacity:0} }
 
-  /* S5 당첨 연출 */
-  #scr-reveal { justify-content:center; align-items:center; gap:10px; color:#fff; }
-  #reveal-card { position:relative; width:min(66vw,43vh); aspect-ratio:1200/1600; container-type:inline-size; animation:cardIn .55s cubic-bezier(.2,1.6,.4,1); filter:drop-shadow(0 8px 24px rgba(0,0,0,.55)); }
+  /* 당첨 연출 (S6 진입 시 — 구 S5 통합) */
   @keyframes cardIn { from{transform:scale(.2) rotate(-12deg);opacity:0} to{transform:none;opacity:1} }
-  #reveal-card .r-img { position:absolute; left:50%; top:38.6%; transform:translate(-50%,-50%); width:79%; height:61%; border-radius:10px; overflow:hidden; background:transparent; font-size:24cqw; color:#fff; display:flex; align-items:center; justify-content:center; z-index:1; }
-  #reveal-card .r-img>img { width:100%; height:100%; object-fit:cover; display:block; }
-  #reveal-card .r-frame { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
-  #reveal-card .r-grade { position:absolute; top:-7%; left:50%; transform:translateX(-50%); width:30%; aspect-ratio:1/1; z-index:3; filter:drop-shadow(0 3px 7px rgba(0,0,0,.55)); }
-  #reveal-card .r-name { position:absolute; left:50%; top:84%; transform:translate(-50%,-50%); width:82%; text-align:center; font-size:6.2cqw; font-weight:900; line-height:1.12; word-break:keep-all; color:#FFE08A; text-shadow:0 2px 4px rgba(0,0,0,.95),0 0 3px rgba(0,0,0,.8); z-index:3; }
-  #reveal-sub { font-size:14px; opacity:.9; margin-top:8px; }
   /* 번개 이펙트 */
   #fx-flash { position:absolute; inset:0; background:radial-gradient(circle,#FFF8D0,#FFD14A 60%,transparent); opacity:0; pointer-events:none; z-index:30; }
   #fx-flash.go { animation:flash .6s ease-out; }
@@ -267,7 +259,7 @@
   /* S6 결과 (스태프 제시) */
   #scr-result { --cw:min(92vw,33vh); color:#fff; justify-content:center; align-items:center; gap:18px; padding:10px; overflow-y:auto; }
   #scr-result h2 { font-size:78px; font-weight:900; letter-spacing:-.02em; line-height:1.05; text-align:center; width:100%; word-break:keep-all; }
-  #result-card { position:relative; width:var(--cw); margin-top:3.5vh; aspect-ratio:1200/1600; container-type:inline-size; filter:drop-shadow(0 8px 24px rgba(0,0,0,.55)); }
+  #result-card { position:relative; width:var(--cw); margin-top:3.5vh; aspect-ratio:1200/1600; container-type:inline-size; filter:drop-shadow(0 8px 24px rgba(0,0,0,.55)); animation:cardIn .55s cubic-bezier(.2,1.6,.4,1); }
   #result-card .rc-img { position:absolute; left:50%; top:38.6%; transform:translate(-50%,-50%); width:79%; height:61%; border-radius:10px; overflow:hidden; background:transparent; font-size:24cqw; color:#fff; display:flex; align-items:center; justify-content:center; z-index:1; }
   #result-card .rc-img>img { width:100%; height:100%; object-fit:cover; display:block; }
   #result-card .rc-frame { position:absolute; inset:0; width:100%; height:100%; z-index:2; pointer-events:none; }
@@ -309,7 +301,8 @@
   table.adm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
   table.adm-tbl th, table.adm-tbl td { border-bottom:1px solid #332a5e; padding:7px 5px; text-align:left; }
   table.adm-tbl th { color:var(--gold-400); }
-  .prize-edit-row { display:grid; grid-template-columns:26px 40px 46px 1fr 46px 46px 48px 44px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .prize-edit-row { display:grid; grid-template-columns:26px 40px 46px 1fr 46px 46px 44px 48px 44px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .cool-in { border-color:#7d6bd6 !important; } /* 등급별 쿨다운(분) 칸 */
   .rem-in { border-color:#caa24a !important; color:#ffe14d !important; } /* 잔여 수량 칸 — 골드로 구분 */
   .prize-edit-row .pmove { display:flex; flex-direction:column; gap:2px; }
   .prize-edit-row .pmove button { height:15px; line-height:1; font-size:9px; padding:0; border:none; border-radius:4px; background:var(--purple-600); color:#fff; cursor:pointer; }
@@ -366,7 +359,6 @@
     #draw-box { gap:22px; }
     #draw-box .npc-art .npc-media { font-size:165px; }
     #draw-box .draw-msg { font-size:23px; }
-    #reveal-sub { font-size:19px; }
     #scr-result { gap:18px; }
     #scr-result h2 { font-size:96px; }
     #result-lastone { font-size:19px; padding:12px; }
@@ -449,18 +441,7 @@
     </div>
   </div>
 
-  <!-- S5 당첨 연출 -->
-  <div class="screen" id="scr-reveal" onclick="afterReveal()">
-    <div id="reveal-card">
-      <div class="r-img img-fallback" id="r-img">🏆</div>
-      <img class="r-frame" id="r-frame" src="assets/frames/frame-purple-card.png?v=2" alt="">
-      <div class="r-grade" id="r-grade">A상</div>
-      <div class="r-name" id="r-name"></div>
-    </div>
-    <div id="reveal-sub">화면을 터치하면 계속합니다.</div>
-  </div>
-
-  <!-- S6 결과 -->
+  <!-- S6 결과 (당첨 연출 포함 — 구 S5 통합) -->
   <div class="screen" id="scr-result">
     <h2>🎉 당첨을 축하합니다!</h2>
     <div id="result-card">
@@ -525,7 +506,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v20';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v21';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -591,10 +572,14 @@ function totalRemainAll(){ return cfg.ips.reduce((a,ip)=>a+remainOf(ip),0); }
 let cooldowns = loadCooldowns();
 function loadCooldowns(){ try{ const r=localStorage.getItem(K_COOL); if(r) return JSON.parse(r); }catch(e){} return {}; }
 function saveCooldowns(){ try{ localStorage.setItem(K_COOL, JSON.stringify(cooldowns)); }catch(e){} }
-function cooldownMs(){ const m = cfg.cooldownMin==null ? 15 : Math.max(0, parseInt(cfg.cooldownMin)||0); return m*60000; }
-function isCooling(ip,p){ if(!p || p.tier!=='high' || !cooldownMs()) return false; const u=cooldowns[ip.id+'|'+p.grade]; return !!u && u>Date.now(); }
+function cooldownMs(p){ // 등급별 coolMin 우선, 없으면 설정 탭 기본값(기본 15분). 0=끔
+  const base = cfg.cooldownMin==null ? 15 : Math.max(0, parseInt(cfg.cooldownMin)||0);
+  const m = (p && p.coolMin!=null) ? Math.max(0, parseInt(p.coolMin)||0) : base;
+  return m*60000;
+}
+function isCooling(ip,p){ if(!p || p.tier!=='high' || !cooldownMs(p)) return false; const u=cooldowns[ip.id+'|'+p.grade]; return !!u && u>Date.now(); }
 function coolLeftMin(ip,p){ const u=cooldowns[ip.id+'|'+p.grade]||0; return Math.max(0, Math.ceil((u-Date.now())/60000)); }
-function startCooldown(ip,p){ if(!p || p.tier!=='high' || !cooldownMs()) return; cooldowns[ip.id+'|'+p.grade]=Date.now()+cooldownMs(); saveCooldowns(); }
+function startCooldown(ip,p){ if(!p || p.tier!=='high' || !cooldownMs(p)) return; cooldowns[ip.id+'|'+p.grade]=Date.now()+cooldownMs(p); saveCooldowns(); }
 
 /* ════════════════ IndexedDB 이미지/미디어 저장 ════════════════ */
 let idb=null;
@@ -805,7 +790,7 @@ function pickDraw(){
   startCooldown(curIp, prize); // 상위 등급이면 재당첨 방지 시작
   logArr.push({ timestamp:new Date().toISOString(), ipId:curIp.id, ipName:curIp.name, grade:prize.grade, prizeName: won ? (prize.name+' - '+won.name) : prize.name, isLastOne:isLucky, luckyGrade:isLucky?prize.grade:'', serial }); saveLog();
   lastResult={ ip:curIp, prize, isLucky, serial, high:(prize.tier==='high'), wonName, wonImageKey };
-  setTimeout(()=>showReveal(), 360);
+  setTimeout(()=>showResult(), 360);
 }
 function nextSerial(){
   const today=dateKey(new Date());
@@ -814,22 +799,15 @@ function nextSerial(){
 }
 function dateKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
-/* ════════════════ S5 당첨 연출 ════════════════ */
-function showReveal(){
-  const {prize, high, isLucky, wonName, wonImageKey}=lastResult;
-  const card=document.getElementById('reveal-card');
-  card.classList.toggle('gold', high);  /* A·B·C·스페셜(상위) = 골드 프레임, 그 외 = 퍼플 */
-  document.getElementById('r-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png?v=2';
-  const rg=document.getElementById('r-grade'); rg.textContent=prize.grade; rg.dataset.tone=gradeTone(prize.grade);
-  document.getElementById('r-img').outerHTML = imgTag(wonImageKey!=null?wonImageKey:prize.imageKey,'r-img', gradeEmoji(prize.tier)).replace('class="','id="r-img" class="');
-  document.getElementById('r-name').textContent = wonName!=null?wonName:prize.name;
-  document.getElementById('reveal-sub').textContent = isLucky ? '🍀 행운상! 스토어 할인 쿠폰도 함께! (터치)' : '화면을 터치하면 계속합니다.';
-  go('scr-reveal');
+/* ════════════════ S6 결과 (당첨 연출 포함 — 구 S5 통합) ════════════════
+   뽑기 직후 결과 화면이 연출과 함께 등장: 카드 cardIn 애니메이션 +
+   상위/행운상 = specialFx(번개·색종이·업로드 스페셜 효과음), 일반 = 일반당첨음 */
+function showResult(){
+  renderResult();
+  go('scr-result');
+  const {high, isLucky}=lastResult;
   if(high || isLucky) specialFx(); else playSfx('win');
 }
-function afterReveal(){ renderResult(); go('scr-result'); }
-
-/* ════════════════ S6 결과 ════════════════ */
 function renderResult(){
   const {ip, prize, isLucky, serial, high, wonName, wonImageKey}=lastResult;
   document.getElementById('rc-frame').src='assets/frames/frame-'+(high?'gold':'purple')+'-card.png?v=2';
@@ -927,6 +905,9 @@ function renderAdmIps(){
         ${bundled
           ? `<input type="number" class="rem-in" value="${prizeRemain(ip,pi)}" title="잔여 합계(하위에서 조정)" disabled style="opacity:.55">`
           : `<input type="number" class="rem-in" min="0" value="${prizeRemain(ip,pi)}" title="잔여 수량 — 수정 시 즉시 반영" onchange="admEditRemain(${ii},${pi},this.value)">`}
+        ${p.tier==='high'
+          ? `<input type="number" class="cool-in" min="0" value="${p.coolMin==null?'':p.coolMin}" placeholder="${cfg.cooldownMin==null?15:cfg.cooldownMin}" title="이 등급 쿨다운(분) — 비우면 설정 탭 기본값, 0=이 등급만 끔" onchange="admEditPrize(${ii},${pi},'coolMin',this.value)">`
+          : `<input type="number" class="cool-in" value="" title="쿨다운은 상위 등급만" disabled style="opacity:.35">`}
         <button class="adm-btn sec" onclick="admPickImg(${ii},${pi})">이미지</button>
         <button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].prizes[${pi}].imageKey,'prize')">조정</button>
         <button class="adm-btn sec ${bundled?'bdl-on':''}" onclick="admToggleBundle(${ii},${pi})" title="여러 하위상품을 묶어 당첨 시 랜덤 1개 지급">${bundled?'번들✓':'번들'}</button>
@@ -956,7 +937,7 @@ function renderAdmIps(){
       <h4>IP ${ii+1} <button class="adm-btn dng" style="float:right" onclick="admDelIp(${ii})">IP 삭제</button></h4>
       <div class="adm-row"><label>IP명</label><input value="${escAttr(ip.name)}" onchange="admEditIp(${ii},'name',this.value)"></div>
       <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].heroImageKey,'ipcard')">조정</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
-      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">순서(▲▼) / 등급 / 상위·일반 / 경품명 / 초기수량 / <b style="color:#ffe14d">잔여(골드칸·즉시반영)</b> / 이미지 / 조정 / 번들</div>
+      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">순서(▲▼) / 등급 / 상위·일반 / 경품명 / 초기수량 / <b style="color:#ffe14d">잔여(골드칸·즉시반영)</b> / 쿨다운분(상위만·빈칸=기본값) / 이미지 / 조정 / 번들</div>
       ${prizeRows}
       <button class="adm-btn sec" onclick="admAddPrize(${ii})">+ 등급 추가</button>
       <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button><button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].lastOne||{}).imageKey,'lucky')">조정</button><button class="adm-btn dng" onclick="admDelLastOne(${ii})">삭제</button><span class="adm-thumb">${ip.lastOne&&ip.lastOne.imageKey&&imgCache[ip.lastOne.imageKey]?`<img src="${imgCache[ip.lastOne.imageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🍀'}</span></div>
@@ -968,7 +949,15 @@ function renderAdmIps(){
   const save=document.createElement('button'); save.className='adm-btn pri'; save.style.cssText='width:100%;margin-top:10px;padding:14px'; save.textContent='💾 저장 (재고 초기화 확인)'; save.onclick=admSaveCfg; root.appendChild(save);
 }
 function admEditIp(i,f,v){ cfg.ips[i][f]=v; }
-function admEditPrize(i,pi,f,v){ cfg.ips[i].prizes[pi][f] = f==='count'? (Math.max(0,parseInt(v)||0)) : v; }
+function admEditPrize(i,pi,f,v){
+  const p=cfg.ips[i].prizes[pi];
+  if(f==='coolMin'){ // 빈칸 = 기본값 사용(필드 제거), 숫자 = 등급별 값(0=끔)
+    if(String(v).trim()==='') delete p.coolMin; else p.coolMin=Math.max(0,parseInt(v)||0);
+    return;
+  }
+  p[f] = f==='count'? (Math.max(0,parseInt(v)||0)) : v;
+  if(f==='tier') renderAdmIps(); // 쿨다운 칸 활성/비활성 갱신
+}
 /* 잔여 수량 즉시 조정 — stock에 바로 쓰고 저장(설정 저장 버튼과 무관). 0~초기값 클램프 */
 function admEditRemain(i,pi,v){
   const ip=cfg.ips[i], p=ip.prizes[pi]; let n=Math.max(0,parseInt(v)||0);
@@ -1139,7 +1128,7 @@ function renderAdmSettings(){
     <div class="adm-row"><label>PIN</label><input id="set-pin" value="${escAttr(cfg.adminPin)}"></div>
     <div class="adm-row"><label>유휴(초)</label><input id="set-idle" type="number" min="10" value="${cfg.idleTimeoutSec}"></div>
     <div class="adm-row"><label>쿨다운(분)</label><input id="set-cool" type="number" min="0" value="${cfg.cooldownMin==null?15:cfg.cooldownMin}"></div>
-    <div class="muted-note">쿨다운: 상위(A·B·C·스페셜) 등급 당첨 후 <b>같은 등급</b>이 N분간 안 뽑히게 함 · <b>0 = 사용 안 함</b> · 남은 재고가 전부 쿨다운 중이면 무시하고 지급(100% 당첨 유지)</div>
+    <div class="muted-note">쿨다운 <b>기본값</b>: 상위(A·B·C·스페셜) 등급 당첨 후 <b>같은 등급</b>이 N분간 안 뽑히게 함 · <b>0 = 사용 안 함</b> · 상품 탭에서 <b>등급별로 따로</b> 지정 가능(빈칸=이 기본값) · 남은 재고가 전부 쿨다운 중이면 무시하고 지급(100% 당첨 유지)</div>
     <div class="adm-row"><label>음소거</label><button class="adm-btn ${cfg.muted?'dng':'sec'}" onclick="toggleMute()">${cfg.muted?'🔇 음소거 ON':'🔊 소리 ON'}</button></div>
     <button class="adm-btn pri" style="width:100%;margin-top:8px" onclick="saveSettings()">설정 저장</button>
   </div>
