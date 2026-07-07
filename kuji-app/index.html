@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v23';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v24';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -1156,7 +1156,7 @@ function renderAdmSettings(){
   root.innerHTML=`<div class="adm-card"><h4>기본 설정</h4>
     <div class="adm-row"><label>이벤트명</label><input id="set-name" value="${escAttr(cfg.eventName)}"></div>
     <div class="adm-row"><label>PIN</label><input id="set-pin" value="${escAttr(cfg.adminPin)}"></div>
-    <div class="adm-row"><label>유휴(초)</label><input id="set-idle" type="number" min="10" value="${cfg.idleTimeoutSec}"></div>
+    <div class="adm-row"><label>유휴(초)</label><input id="set-idle" type="number" min="3" value="${cfg.idleTimeoutSec}" title="IP선택·라인업·결과 화면 무입력 복귀(최소 3초)"></div>
     <div class="adm-row"><label>라인업(S3)</label><button class="adm-btn ${lineupOn()?'sec':'dng'}" onclick="toggleLineup()">${lineupOn()?'👁 표시 중':'🙈 숨김 중 (뽑기 직행)'}</button></div>
     <div class="adm-row"><label>뽑기복귀(초)</label><input id="set-drawidle" type="number" min="0" value="${cfg.drawIdleSec==null?5:cfg.drawIdleSec}"></div>
     <div class="muted-note">라인업 숨김 = 경품 리스트 화면(S3) 없이 S1(IP 여러 개면 IP선택) → <b>바로 뽑기 화면</b> · 뽑기복귀 = 뽑기 화면에서 무입력 N초 후 대기화면 복귀(<b>뽑기 버튼 누르기 전에만</b>, 0=끔) · 토글은 즉시 반영</div>
@@ -1200,7 +1200,7 @@ function renderAdmSettings(){
   </div>
   <div class="muted-note" style="text-align:center;margin:14px 0 4px">앱 버전 <b>${APP_VER}</b></div>`;
 }
-function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); const cv=parseInt(document.getElementById('set-cool').value); cfg.cooldownMin=isNaN(cv)?15:Math.max(0,cv); const dv=parseInt(document.getElementById('set-drawidle').value); cfg.drawIdleSec=isNaN(dv)?5:Math.max(0,dv); saveCfg(); bootIdle(); toast('설정 저장됨'); }
+function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(3,parseInt(document.getElementById('set-idle').value)||30); const cv=parseInt(document.getElementById('set-cool').value); cfg.cooldownMin=isNaN(cv)?15:Math.max(0,cv); const dv=parseInt(document.getElementById('set-drawidle').value); cfg.drawIdleSec=isNaN(dv)?5:Math.max(0,dv); saveCfg(); bootIdle(); toast('설정 저장됨'); }
 /* S3 라인업 표시/숨김 — 즉시 저장·즉시 반영 (현장 전환용) */
 function toggleLineup(){ cfg.showLineup = !lineupOn(); saveCfg(); toast(lineupOn()?'라인업(S3) 표시 — 기존 플로우':'라인업(S3) 숨김 — 뽑기 직행'); renderAdmSettings(); }
 async function admPickHeroBanner(){ const key='hero_banner_'+Date.now(); const k=await uploadImg(key); if(k){ if(cfg.heroBannerKey){try{await idbDel(cfg.heroBannerKey);}catch(e){}} cfg.heroBannerKey=k; saveCfg(); toast('히어로 배너 등록됨'); renderAdmSettings(); } }
