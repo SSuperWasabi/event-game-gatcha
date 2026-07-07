@@ -524,7 +524,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1';
-const APP_VER='v18';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v19';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -846,14 +846,24 @@ function fireConfetti(){
 /* ════════════════ 사운드 (효과음=WebAudio 합성, BGM=업로드 파일) ════════════════ */
 let actx=null; function audioCtx(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
 function tone(freq,dur,type,vol,delay){ const c=audioCtx(); if(!c||cfg.muted)return; const t=c.currentTime+(delay||0); const o=c.createOscillator(),g=c.createGain(); o.type=type||'sine'; o.frequency.value=freq; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.2,t+.01); g.gain.exponentialRampToValueAtTime(.001,t+dur); o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur); }
-/* 효과음: 업로드 파일 우선, 없으면 기본 합성음(WebAudio) 폴백 */
-const sfxEl={ pick:new Audio(), win:new Audio(), special:new Audio() }; const sfxUrls={};
-async function loadSfx(){ for(const k of ['pick','win','special']){ const d=await idbGet('sfx_'+k); if(!d)continue; if(sfxUrls[k]){try{URL.revokeObjectURL(sfxUrls[k]);}catch(e){}} if(typeof d==='string'){ sfxEl[k].src=d; } else { const b=mediaBlob(d); if(b) sfxEl[k].src=sfxUrls[k]=URL.createObjectURL(b); } } }
+/* 효과음: 업로드 파일 우선, 없으면 기본 합성음(WebAudio) 폴백
+   ※ iOS는 blob <audio>를 재생 완료 후 되감아 재생하면 두 번째부터 무음이 되는 결함이 있어,
+   업로드 효과음은 WebAudio 버퍼로 디코드해 매번 새 소스로 재생한다(재사용 없음 = 항상 소리남) */
+const sfxEl={ pick:new Audio(), win:new Audio(), special:new Audio() }; const sfxUrls={}; const sfxBuf={};
+async function sfxArrayBuffer(d){ try{ if(typeof d==='string'){ const b=dataURLtoBlob(d); return b? await b.arrayBuffer():null; } if(d&&d.buf) return d.buf.slice(0); const b=mediaBlob(d); return b? await b.arrayBuffer():null; }catch(e){ return null; } }
+async function loadSfx(){ for(const k of ['pick','win','special']){ const d=await idbGet('sfx_'+k); if(!d){ delete sfxBuf[k]; sfxEl[k].src=''; continue; }
+  try{ const ab=await sfxArrayBuffer(d); const c=audioCtx(); if(ab&&c){ sfxBuf[k]=await c.decodeAudioData(ab); sfxEl[k].src=''; continue; } }catch(e){}
+  /* 디코드 실패 시에만 <audio> 폴백 */
+  delete sfxBuf[k]; if(sfxUrls[k]){try{URL.revokeObjectURL(sfxUrls[k]);}catch(e){}}
+  if(typeof d==='string'){ sfxEl[k].src=d; } else { const b=mediaBlob(d); if(b) sfxEl[k].src=sfxUrls[k]=URL.createObjectURL(b); } } }
 function playSfx(kind){
   if(cfg.muted)return;
   const slot={pick:'pick',win:'win',fanfare:'special'}[kind];
+  const c=audioCtx(); if(c&&c.state==='suspended'){ try{c.resume();}catch(e){} }
+  const buf=slot&&sfxBuf[slot];
+  if(buf&&c){ try{ const s=c.createBufferSource(), g=c.createGain(); s.buffer=buf; g.gain.value=.8; s.connect(g); g.connect(c.destination); s.start(); return; }catch(e){} }
   const a=slot&&sfxEl[slot];
-  if(a&&a.src){ try{ a.currentTime=0; a.volume=.8; a.play().catch(()=>{}); return; }catch(e){} }
+  if(a&&a.src){ try{ a.pause(); a.currentTime=0; a.volume=.8; const p=a.play(); if(p&&p.catch)p.catch(()=>{}); return; }catch(e){} }
   // 폴백: 기본 합성음
   if(kind==='pick'){ tone(660,.12,'triangle',.18); }
   else if(kind==='win'){ tone(523,.18,'sine',.2); tone(784,.25,'sine',.18,.12); }
