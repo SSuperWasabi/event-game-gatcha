@@ -309,7 +309,8 @@
   table.adm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
   table.adm-tbl th, table.adm-tbl td { border-bottom:1px solid #332a5e; padding:7px 5px; text-align:left; }
   table.adm-tbl th { color:var(--gold-400); }
-  .prize-edit-row { display:grid; grid-template-columns:26px 40px 46px 1fr 46px 48px 44px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .prize-edit-row { display:grid; grid-template-columns:26px 40px 46px 1fr 46px 46px 48px 44px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .rem-in { border-color:#caa24a !important; color:#ffe14d !important; } /* 잔여 수량 칸 — 골드로 구분 */
   .prize-edit-row .pmove { display:flex; flex-direction:column; gap:2px; }
   .prize-edit-row .pmove button { height:15px; line-height:1; font-size:9px; padding:0; border:none; border-radius:4px; background:var(--purple-600); color:#fff; cursor:pointer; }
   .prize-edit-row .pmove button:disabled { opacity:.3; cursor:default; }
@@ -317,7 +318,7 @@
   .prize-edit-row .del { background:var(--brand-red); color:#fff; border:none; border-radius:6px; height:32px; cursor:pointer; }
   .prize-edit-row .bdl-on { background:var(--grad-gold,#caa24a); color:#2a1d05; border:none; }
   .bundle-block { margin:0 0 10px 22px; padding:8px 10px; border-left:2px solid #6b5bd6; background:rgba(107,91,214,.10); border-radius:8px; }
-  .bundle-block .sub-row { display:grid; grid-template-columns:24px 1fr 56px 48px 44px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .bundle-block .sub-row { display:grid; grid-template-columns:24px 1fr 56px 56px 48px 44px 26px; gap:4px; align-items:center; margin-bottom:6px; }
   .bundle-block .sub-row input { padding:6px; border-radius:6px; border:1px solid #443a6e; background:var(--purple-950); color:#fff; font-size:12.5px; width:100%; }
   .bundle-block .sub-row .sub-idx { font-size:11px; color:#9b8fd6; text-align:center; }
   .bundle-block .sub-row .del { background:var(--brand-red); color:#fff; border:none; border-radius:6px; height:30px; cursor:pointer; }
@@ -523,13 +524,13 @@
 
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
-const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1';
-const APP_VER='v19';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
+const APP_VER='v20';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
   return {
-    eventName:'컴투스 팝업 쿠지', adminPin:'0000', idleTimeoutSec:30, muted:false, npcs:[], idleVideos:[],
+    eventName:'컴투스 팝업 쿠지', adminPin:'0000', idleTimeoutSec:30, muted:false, npcs:[], idleVideos:[], cooldownMin:15,
     ips:[{
       id:'ip1', name:'서머너즈 워 컬렉션', heroImageKey:null,
       lastOne:{ name:'스토어 할인 쿠폰', imageKey:null },
@@ -583,6 +584,17 @@ function reconcileStock(){
 function remainOf(ip){ return (stock[ip.id]||[]).reduce((a,b)=>a+cellRemain(b),0); }
 function totalOf(ip){ return ip.prizes.reduce((a,p)=>a+prizeTotal(p),0); }
 function totalRemainAll(){ return cfg.ips.reduce((a,ip)=>a+remainOf(ip),0); }
+
+/* ── 상위 등급 재당첨 방지(쿨다운) ──
+   키: "ipId|등급명" → 만료시각(epoch ms). localStorage에 유지(새로고침 안전), .kuji 백업엔 미포함.
+   cfg.cooldownMin(분): 기본 15, 0 = 기능 끔. 기존 설치(필드 없음)는 15로 간주 */
+let cooldowns = loadCooldowns();
+function loadCooldowns(){ try{ const r=localStorage.getItem(K_COOL); if(r) return JSON.parse(r); }catch(e){} return {}; }
+function saveCooldowns(){ try{ localStorage.setItem(K_COOL, JSON.stringify(cooldowns)); }catch(e){} }
+function cooldownMs(){ const m = cfg.cooldownMin==null ? 15 : Math.max(0, parseInt(cfg.cooldownMin)||0); return m*60000; }
+function isCooling(ip,p){ if(!p || p.tier!=='high' || !cooldownMs()) return false; const u=cooldowns[ip.id+'|'+p.grade]; return !!u && u>Date.now(); }
+function coolLeftMin(ip,p){ const u=cooldowns[ip.id+'|'+p.grade]||0; return Math.max(0, Math.ceil((u-Date.now())/60000)); }
+function startCooldown(ip,p){ if(!p || p.tier!=='high' || !cooldownMs()) return; cooldowns[ip.id+'|'+p.grade]=Date.now()+cooldownMs(); saveCooldowns(); }
 
 /* ════════════════ IndexedDB 이미지/미디어 저장 ════════════════ */
 let idb=null;
@@ -766,11 +778,18 @@ function pickDraw(){
   const btn=document.getElementById('draw-go-btn'); if(btn) btn.disabled=true;
   playSfx('pick');
   // 비복원 추첨 (랜덤·100% 당첨) — 번들은 하위까지 평탄화하여 재고 비례로 추첨
-  const arr=stock[curIp.id]; const pool=[];
-  arr.forEach((cell,i)=>{
-    if(Array.isArray(cell)){ cell.forEach((c,j)=>{ for(let k=0;k<c;k++) pool.push({i,sub:j}); }); }
-    else { for(let k=0;k<cell;k++) pool.push({i,sub:null}); }
-  });
+  // 쿨다운 중인 상위 등급은 풀에서 제외하되, 제외 후 풀이 비면 쿨다운 무시(100% 당첨 보장)
+  const arr=stock[curIp.id];
+  const buildPool=(ignoreCool)=>{
+    const pool=[];
+    arr.forEach((cell,i)=>{
+      if(!ignoreCool && isCooling(curIp, curIp.prizes[i])) return;
+      if(Array.isArray(cell)){ cell.forEach((c,j)=>{ for(let k=0;k<c;k++) pool.push({i,sub:j}); }); }
+      else { for(let k=0;k<cell;k++) pool.push({i,sub:null}); }
+    });
+    return pool;
+  };
+  let pool=buildPool(false); if(!pool.length) pool=buildPool(true);
   const hit=pool[Math.floor(Math.random()*pool.length)];
   const idx=hit.i, sub=hit.sub;
   if(sub==null) arr[idx]--; else arr[idx][sub]--;
@@ -783,6 +802,7 @@ function pickDraw(){
   // 행운상: 이 등급(번들이면 전체 하위 합계)의 마지막 1개를 뽑은 경우 (스토어 할인 쿠폰 현장 지급)
   const isLucky = cellRemain(arr[idx])===0 && !!(curIp.lastOne && curIp.lastOne.name);
   const serial = nextSerial();
+  startCooldown(curIp, prize); // 상위 등급이면 재당첨 방지 시작
   logArr.push({ timestamp:new Date().toISOString(), ipId:curIp.id, ipName:curIp.name, grade:prize.grade, prizeName: won ? (prize.name+' - '+won.name) : prize.name, isLastOne:isLucky, luckyGrade:isLucky?prize.grade:'', serial }); saveLog();
   lastResult={ ip:curIp, prize, isLucky, serial, high:(prize.tier==='high'), wonName, wonImageKey };
   setTimeout(()=>showReveal(), 360);
@@ -903,7 +923,10 @@ function renderAdmIps(){
         <input value="${escAttr(p.name)}" onchange="admEditPrize(${ii},${pi},'name',this.value)" placeholder="${bundled?'번들명 (예: 가디언스클럽 랜덤)':'경품명'}">
         ${bundled
           ? `<input type="number" value="${prizeTotal(p)}" title="하위 수량 합계(자동)" disabled style="opacity:.55">`
-          : `<input type="number" min="0" value="${p.count}" onchange="admEditPrize(${ii},${pi},'count',this.value)">`}
+          : `<input type="number" min="0" value="${p.count}" title="초기 수량 (저장 버튼으로 커밋)" onchange="admEditPrize(${ii},${pi},'count',this.value)">`}
+        ${bundled
+          ? `<input type="number" class="rem-in" value="${prizeRemain(ip,pi)}" title="잔여 합계(하위에서 조정)" disabled style="opacity:.55">`
+          : `<input type="number" class="rem-in" min="0" value="${prizeRemain(ip,pi)}" title="잔여 수량 — 수정 시 즉시 반영" onchange="admEditRemain(${ii},${pi},this.value)">`}
         <button class="adm-btn sec" onclick="admPickImg(${ii},${pi})">이미지</button>
         <button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].prizes[${pi}].imageKey,'prize')">조정</button>
         <button class="adm-btn sec ${bundled?'bdl-on':''}" onclick="admToggleBundle(${ii},${pi})" title="여러 하위상품을 묶어 당첨 시 랜덤 1개 지급">${bundled?'번들✓':'번들'}</button>
@@ -915,7 +938,8 @@ function renderAdmIps(){
           subRows+=`<div class="sub-row">
             <span class="sub-idx">${si+1}</span>
             <input value="${escAttr(s.name)}" onchange="admEditSub(${ii},${pi},${si},'name',this.value)" placeholder="하위 경품명">
-            <input type="number" min="0" value="${s.count}" onchange="admEditSub(${ii},${pi},${si},'count',this.value)">
+            <input type="number" min="0" value="${s.count}" title="초기 수량" onchange="admEditSub(${ii},${pi},${si},'count',this.value)">
+            <input type="number" class="rem-in" min="0" value="${(Array.isArray((stock[ip.id]||[])[pi])?stock[ip.id][pi][si]:0)??0}" title="잔여 수량 — 수정 시 즉시 반영" onchange="admEditSubRemain(${ii},${pi},${si},this.value)">
             <button class="adm-btn sec" onclick="admPickSubImg(${ii},${pi},${si})">이미지</button>
             <button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].prizes[${pi}].subs[${si}]||{}).imageKey,'prize')">조정</button>
             <button class="del" onclick="admDelSub(${ii},${pi},${si})">×</button>
@@ -932,7 +956,7 @@ function renderAdmIps(){
       <h4>IP ${ii+1} <button class="adm-btn dng" style="float:right" onclick="admDelIp(${ii})">IP 삭제</button></h4>
       <div class="adm-row"><label>IP명</label><input value="${escAttr(ip.name)}" onchange="admEditIp(${ii},'name',this.value)"></div>
       <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].heroImageKey,'ipcard')">조정</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
-      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">순서(▲▼) / 등급 / 상위·일반 / 경품명 / 수량 / 이미지 / 조정 / 번들</div>
+      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">순서(▲▼) / 등급 / 상위·일반 / 경품명 / 초기수량 / <b style="color:#ffe14d">잔여(골드칸·즉시반영)</b> / 이미지 / 조정 / 번들</div>
       ${prizeRows}
       <button class="adm-btn sec" onclick="admAddPrize(${ii})">+ 등급 추가</button>
       <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button><button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].lastOne||{}).imageKey,'lucky')">조정</button><button class="adm-btn dng" onclick="admDelLastOne(${ii})">삭제</button><span class="adm-thumb">${ip.lastOne&&ip.lastOne.imageKey&&imgCache[ip.lastOne.imageKey]?`<img src="${imgCache[ip.lastOne.imageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🍀'}</span></div>
@@ -945,6 +969,19 @@ function renderAdmIps(){
 }
 function admEditIp(i,f,v){ cfg.ips[i][f]=v; }
 function admEditPrize(i,pi,f,v){ cfg.ips[i].prizes[pi][f] = f==='count'? (Math.max(0,parseInt(v)||0)) : v; }
+/* 잔여 수량 즉시 조정 — stock에 바로 쓰고 저장(설정 저장 버튼과 무관). 0~초기값 클램프 */
+function admEditRemain(i,pi,v){
+  const ip=cfg.ips[i], p=ip.prizes[pi]; let n=Math.max(0,parseInt(v)||0);
+  const max=prizeTotal(p); if(n>max){ n=max; toast('잔여는 초기 수량('+max+') 이하만 가능'); }
+  if(!Array.isArray(stock[ip.id])) reconcileStock();
+  stock[ip.id][pi]=n; saveStock(); toast('잔여 '+n+'개로 조정됨'); renderAdmIps();
+}
+function admEditSubRemain(i,pi,si,v){
+  const ip=cfg.ips[i], p=ip.prizes[pi]; let n=Math.max(0,parseInt(v)||0);
+  const max=+((p.subs[si]||{}).count)||0; if(n>max){ n=max; toast('잔여는 초기 수량('+max+') 이하만 가능'); }
+  if(!Array.isArray(stock[ip.id]) || !Array.isArray(stock[ip.id][pi])) reconcileStock();
+  stock[ip.id][pi][si]=n; saveStock(); toast('잔여 '+n+'개로 조정됨'); renderAdmIps();
+}
 function admEditLastOne(i,v){ if(!cfg.ips[i].lastOne) cfg.ips[i].lastOne={name:'',imageKey:null}; cfg.ips[i].lastOne.name=v; }
 function admAddPrize(i){ cfg.ips[i].prizes.push({grade:'',name:'',imageKey:null,count:1,tier:'normal'}); renderAdmIps(); }
 function admDelPrize(i,pi){ cfg.ips[i].prizes.splice(pi,1); renderAdmIps(); }
@@ -991,7 +1028,7 @@ function renderAdmStock(){
   cfg.ips.forEach(ip=>{
     html+=`<div style="margin:10px 0 4px;font-weight:700">${esc(ip.name)} — 잔여 ${remainOf(ip)}/${totalOf(ip)}</div><table class="adm-tbl"><tr><th>등급</th><th>경품</th><th>잔여/초기</th></tr>`;
     ip.prizes.forEach((p,i)=>{
-      html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}${isBundle(p)?' <span style="color:#ffe14d">(번들)</span>':''}</td><td>${prizeRemain(ip,i)} / ${prizeTotal(p)}</td></tr>`;
+      html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}${isBundle(p)?' <span style="color:#ffe14d">(번들)</span>':''}</td><td>${prizeRemain(ip,i)} / ${prizeTotal(p)}${isCooling(ip,p)?` <span style="color:#ffe14d">🔒${coolLeftMin(ip,p)}분</span>`:''}</td></tr>`;
       if(isBundle(p)){ const cell=(stock[ip.id]||[])[i]||[]; p.subs.forEach((s,si)=>{ html+=`<tr><td></td><td style="padding-left:18px;color:#cfc3ff">└ ${esc(s.name||'(이름없음)')}</td><td>${(cell[si]??0)} / ${(+s.count||0)}</td></tr>`; }); }
     });
     html+=`</table>`;
@@ -1101,6 +1138,8 @@ function renderAdmSettings(){
     <div class="adm-row"><label>이벤트명</label><input id="set-name" value="${escAttr(cfg.eventName)}"></div>
     <div class="adm-row"><label>PIN</label><input id="set-pin" value="${escAttr(cfg.adminPin)}"></div>
     <div class="adm-row"><label>유휴(초)</label><input id="set-idle" type="number" min="10" value="${cfg.idleTimeoutSec}"></div>
+    <div class="adm-row"><label>쿨다운(분)</label><input id="set-cool" type="number" min="0" value="${cfg.cooldownMin==null?15:cfg.cooldownMin}"></div>
+    <div class="muted-note">쿨다운: 상위(A·B·C·스페셜) 등급 당첨 후 <b>같은 등급</b>이 N분간 안 뽑히게 함 · <b>0 = 사용 안 함</b> · 남은 재고가 전부 쿨다운 중이면 무시하고 지급(100% 당첨 유지)</div>
     <div class="adm-row"><label>음소거</label><button class="adm-btn ${cfg.muted?'dng':'sec'}" onclick="toggleMute()">${cfg.muted?'🔇 음소거 ON':'🔊 소리 ON'}</button></div>
     <button class="adm-btn pri" style="width:100%;margin-top:8px" onclick="saveSettings()">설정 저장</button>
   </div>
@@ -1139,7 +1178,7 @@ function renderAdmSettings(){
   </div>
   <div class="muted-note" style="text-align:center;margin:14px 0 4px">앱 버전 <b>${APP_VER}</b></div>`;
 }
-function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); saveCfg(); bootIdle(); toast('설정 저장됨'); }
+function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); const cv=parseInt(document.getElementById('set-cool').value); cfg.cooldownMin=isNaN(cv)?15:Math.max(0,cv); saveCfg(); bootIdle(); toast('설정 저장됨'); }
 async function admPickHeroBanner(){ const key='hero_banner_'+Date.now(); const k=await uploadImg(key); if(k){ if(cfg.heroBannerKey){try{await idbDel(cfg.heroBannerKey);}catch(e){}} cfg.heroBannerKey=k; saveCfg(); toast('히어로 배너 등록됨'); renderAdmSettings(); } }
 async function delHeroBanner(){ if(cfg.heroBannerKey){ try{await idbDel(cfg.heroBannerKey);}catch(e){} cfg.heroBannerKey=null; saveCfg(); toast('삭제됨'); renderAdmSettings(); } }
 
