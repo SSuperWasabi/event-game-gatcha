@@ -301,8 +301,10 @@
   table.adm-tbl { width:100%; border-collapse:collapse; font-size:13px; }
   table.adm-tbl th, table.adm-tbl td { border-bottom:1px solid #332a5e; padding:7px 5px; text-align:left; }
   table.adm-tbl th { color:var(--gold-400); }
-  .prize-edit-row { display:grid; grid-template-columns:26px 40px 46px 1fr 46px 46px 44px 48px 44px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
+  .prize-edit-row { display:grid; grid-template-columns:26px 40px 46px 1fr 46px 46px 44px 48px 44px 40px 40px 26px; gap:4px; align-items:center; margin-bottom:6px; }
   .cool-in { border-color:#7d6bd6 !important; } /* 등급별 쿨다운(분) 칸 */
+  .prize-edit-row.p-hidden { opacity:.5; } /* 숨김 상품 행 — 흐리게 */
+  .prize-edit-row .hid-on { background:var(--soldout,#8A8A93); color:#fff; border:none; }
   .rem-in { border-color:#caa24a !important; color:#ffe14d !important; } /* 잔여 수량 칸 — 골드로 구분 */
   .prize-edit-row .pmove { display:flex; flex-direction:column; gap:2px; }
   .prize-edit-row .pmove button { height:15px; line-height:1; font-size:9px; padding:0; border:none; border-radius:4px; background:var(--purple-600); color:#fff; cursor:pointer; }
@@ -506,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v21';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v22';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -562,8 +564,9 @@ function reconcileStock(){
   Object.keys(stock).forEach(id=>{ if(!cfg.ips.find(ip=>ip.id===id)){ delete stock[id]; changed=true; } });
   if(changed) saveStock();
 }
-function remainOf(ip){ return (stock[ip.id]||[]).reduce((a,b)=>a+cellRemain(b),0); }
-function totalOf(ip){ return ip.prizes.reduce((a,p)=>a+prizeTotal(p),0); }
+/* 잔여/전체 집계 — 숨김(hidden) 상품은 참여자 노출·추첨 대상이 아니므로 제외 */
+function remainOf(ip){ return (stock[ip.id]||[]).reduce((a,b,i)=>a+((ip.prizes[i]&&ip.prizes[i].hidden)?0:cellRemain(b)),0); }
+function totalOf(ip){ return ip.prizes.reduce((a,p)=>a+(p.hidden?0:prizeTotal(p)),0); }
 function totalRemainAll(){ return cfg.ips.reduce((a,ip)=>a+remainOf(ip),0); }
 
 /* ── 상위 등급 재당첨 방지(쿨다운) ──
@@ -698,6 +701,7 @@ function renderLineup(){
   document.getElementById('lineup-title').innerHTML=`${esc(curIp.name)} <em>잔여 ${remain}/${total}</em>`;
   const grid=document.getElementById('prize-grid'); grid.innerHTML='';
   curIp.prizes.forEach((p,i)=>{
+    if(p.hidden) return; // 숨김 상품은 라인업 미표시
     const left=prizeRemain(curIp,i), tot=prizeTotal(p), out=left===0;
     let g='';
     const onCount=Math.min(left,10);
@@ -768,13 +772,18 @@ function pickDraw(){
   const buildPool=(ignoreCool)=>{
     const pool=[];
     arr.forEach((cell,i)=>{
-      if(!ignoreCool && isCooling(curIp, curIp.prizes[i])) return;
+      const pz=curIp.prizes[i];
+      if(pz && pz.hidden) return; // 숨김 상품은 폴백에서도 추첨 제외
+      if(!ignoreCool && isCooling(curIp, pz)) return;
       if(Array.isArray(cell)){ cell.forEach((c,j)=>{ for(let k=0;k<c;k++) pool.push({i,sub:j}); }); }
       else { for(let k=0;k<cell;k++) pool.push({i,sub:null}); }
     });
     return pool;
   };
   let pool=buildPool(false); if(!pool.length) pool=buildPool(true);
+  if(!pool.length){ // 노출 상품이 모두 소진 (예: 뽑기 화면 도중 숨김 전환) — 안전 복귀
+    drawing=false; if(btn) btn.disabled=false; toast('추첨 가능한 상품이 없습니다'); go('scr-lineup'); renderLineup(); return;
+  }
   const hit=pool[Math.floor(Math.random()*pool.length)];
   const idx=hit.i, sub=hit.sub;
   if(sub==null) arr[idx]--; else arr[idx][sub]--;
@@ -894,7 +903,7 @@ function renderAdmIps(){
     let prizeRows='';
     ip.prizes.forEach((p,pi)=>{
       const bundled=isBundle(p);
-      prizeRows+=`<div class="prize-edit-row">
+      prizeRows+=`<div class="prize-edit-row${p.hidden?' p-hidden':''}">
         <div class="pmove"><button onclick="admMovePrize(${ii},${pi},-1)" ${pi===0?'disabled':''} title="위로">▲</button><button onclick="admMovePrize(${ii},${pi},1)" ${pi===ip.prizes.length-1?'disabled':''} title="아래로">▼</button></div>
         <input value="${escAttr(p.grade)}" onchange="admEditPrize(${ii},${pi},'grade',this.value)" placeholder="등급">
         <select onchange="admEditPrize(${ii},${pi},'tier',this.value)"><option value="normal"${p.tier!=='high'?' selected':''}>일반</option><option value="high"${p.tier==='high'?' selected':''}>상위</option></select>
@@ -911,6 +920,7 @@ function renderAdmIps(){
         <button class="adm-btn sec" onclick="admPickImg(${ii},${pi})">이미지</button>
         <button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].prizes[${pi}].imageKey,'prize')">조정</button>
         <button class="adm-btn sec ${bundled?'bdl-on':''}" onclick="admToggleBundle(${ii},${pi})" title="여러 하위상품을 묶어 당첨 시 랜덤 1개 지급">${bundled?'번들✓':'번들'}</button>
+        <button class="adm-btn sec ${p.hidden?'hid-on':''}" onclick="admToggleHidden(${ii},${pi})" title="숨김 = 라인업 미표시·추첨 제외 (설정·재고 보존, 즉시 반영)">${p.hidden?'숨김':'노출'}</button>
         <button class="del" onclick="admDelPrize(${ii},${pi})">×</button>
       </div>`;
       if(bundled){
@@ -937,7 +947,7 @@ function renderAdmIps(){
       <h4>IP ${ii+1} <button class="adm-btn dng" style="float:right" onclick="admDelIp(${ii})">IP 삭제</button></h4>
       <div class="adm-row"><label>IP명</label><input value="${escAttr(ip.name)}" onchange="admEditIp(${ii},'name',this.value)"></div>
       <div class="adm-row"><label>배너</label><button class="adm-btn sec" onclick="admPickHero(${ii})">이미지 업로드</button><button class="adm-btn sec" onclick="openAdjust(cfg.ips[${ii}].heroImageKey,'ipcard')">조정</button><span class="adm-thumb">${ip.heroImageKey&&imgCache[ip.heroImageKey]?`<img src="${imgCache[ip.heroImageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🎁'}</span></div>
-      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">순서(▲▼) / 등급 / 상위·일반 / 경품명 / 초기수량 / <b style="color:#ffe14d">잔여(골드칸·즉시반영)</b> / 쿨다운분(상위만·빈칸=기본값) / 이미지 / 조정 / 번들</div>
+      <div style="margin:10px 0 4px;font-size:12px;color:#ffe14d">순서(▲▼) / 등급 / 상위·일반 / 경품명 / 초기수량 / <b style="color:#ffe14d">잔여(골드칸·즉시반영)</b> / 쿨다운분(상위만·빈칸=기본값) / 이미지 / 조정 / 번들 / <b style="color:#ffe14d">노출·숨김(즉시반영)</b></div>
       ${prizeRows}
       <button class="adm-btn sec" onclick="admAddPrize(${ii})">+ 등급 추가</button>
       <div class="adm-row" style="margin-top:12px"><label>행운상</label><input value="${escAttr(ip.lastOne?ip.lastOne.name:'')}" placeholder="행운상 경품명 (예: 스토어 할인 쿠폰, 없으면 비움)" onchange="admEditLastOne(${ii},this.value)"><button class="adm-btn sec" onclick="admPickLastOne(${ii})">이미지</button><button class="adm-btn sec" onclick="openAdjust((cfg.ips[${ii}].lastOne||{}).imageKey,'lucky')">조정</button><button class="adm-btn dng" onclick="admDelLastOne(${ii})">삭제</button><span class="adm-thumb">${ip.lastOne&&ip.lastOne.imageKey&&imgCache[ip.lastOne.imageKey]?`<img src="${imgCache[ip.lastOne.imageKey]}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:'🍀'}</span></div>
@@ -974,6 +984,14 @@ function admEditSubRemain(i,pi,si,v){
 function admEditLastOne(i,v){ if(!cfg.ips[i].lastOne) cfg.ips[i].lastOne={name:'',imageKey:null}; cfg.ips[i].lastOne.name=v; }
 function admAddPrize(i){ cfg.ips[i].prizes.push({grade:'',name:'',imageKey:null,count:1,tier:'normal'}); renderAdmIps(); }
 function admDelPrize(i,pi){ cfg.ips[i].prizes.splice(pi,1); renderAdmIps(); }
+/* 상품 노출/숨김 — 긴급 운영용, 즉시 저장·즉시 반영. 숨김 = S3 미표시·추첨 제외·잔여 집계 제외 (설정·재고·이미지 보존) */
+function admToggleHidden(i,pi){
+  const p=cfg.ips[i].prizes[pi];
+  if(p.hidden) delete p.hidden; else p.hidden=true;
+  saveCfg();
+  toast(p.hidden ? '숨김 처리됨 — 라인업·추첨에서 제외' : '노출됨 — 라인업·추첨에 포함');
+  renderAdmIps();
+}
 /* 상품 순서 이동(▲▼) — prizes와 stock을 같은 인덱스로 함께 swap, 즉시 저장 → S3에 그대로 반영 */
 function admMovePrize(i,pi,dir){ const ip=cfg.ips[i], pr=ip.prizes, j=pi+dir; if(j<0||j>=pr.length)return; [pr[pi],pr[j]]=[pr[j],pr[pi]]; const st=stock[ip.id]; if(Array.isArray(st)){ [st[pi],st[j]]=[st[j],st[pi]]; } saveCfg(); saveStock(); renderAdmIps(); toast('순서 변경됨'); }
 /* ── 번들 상품 편집 ── */
@@ -1017,7 +1035,7 @@ function renderAdmStock(){
   cfg.ips.forEach(ip=>{
     html+=`<div style="margin:10px 0 4px;font-weight:700">${esc(ip.name)} — 잔여 ${remainOf(ip)}/${totalOf(ip)}</div><table class="adm-tbl"><tr><th>등급</th><th>경품</th><th>잔여/초기</th></tr>`;
     ip.prizes.forEach((p,i)=>{
-      html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}${isBundle(p)?' <span style="color:#ffe14d">(번들)</span>':''}</td><td>${prizeRemain(ip,i)} / ${prizeTotal(p)}${isCooling(ip,p)?` <span style="color:#ffe14d">🔒${coolLeftMin(ip,p)}분</span>`:''}</td></tr>`;
+      html+=`<tr><td>${esc(p.grade)}</td><td>${esc(p.name)}${isBundle(p)?' <span style="color:#ffe14d">(번들)</span>':''}${p.hidden?' <span style="color:#8A8A93">(숨김)</span>':''}</td><td>${prizeRemain(ip,i)} / ${prizeTotal(p)}${isCooling(ip,p)?` <span style="color:#ffe14d">🔒${coolLeftMin(ip,p)}분</span>`:''}</td></tr>`;
       if(isBundle(p)){ const cell=(stock[ip.id]||[])[i]||[]; p.subs.forEach((s,si)=>{ html+=`<tr><td></td><td style="padding-left:18px;color:#cfc3ff">└ ${esc(s.name||'(이름없음)')}</td><td>${(cell[si]??0)} / ${(+s.count||0)}</td></tr>`; }); }
     });
     html+=`</table>`;
