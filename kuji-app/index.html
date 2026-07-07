@@ -428,7 +428,7 @@
   <!-- S4 뽑기 -->
   <div class="screen" id="scr-draw">
     <div class="topbar">
-      <button class="back" onclick="go('scr-lineup')">←</button>
+      <button class="back" onclick="drawBack()">←</button>
       <div class="title" id="draw-ipname"></div>
     </div>
     <div id="draw-stage">
@@ -508,12 +508,14 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v22';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v23';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
   return {
     eventName:'컴투스 팝업 쿠지', adminPin:'0000', idleTimeoutSec:30, muted:false, npcs:[], idleVideos:[], cooldownMin:15,
+    showLineup:true,   // S3 경품 라인업 표시 (false = S1/S2 → 뽑기 직행)
+    drawIdleSec:5,     // S4 뽑기 전 무입력 복귀(초, 0=끔) — 뽑기 확정 후에는 미적용
     ips:[{
       id:'ip1', name:'서머너즈 워 컬렉션', heroImageKey:null,
       lastOne:{ name:'스토어 할인 쿠폰', imageKey:null },
@@ -630,9 +632,13 @@ function manageIdle(){
   clearTimeout(idleTimer);
   if(idleScreens.includes(currentScreen)){
     idleTimer=setTimeout(resetToIdle, (cfg.idleTimeoutSec||30)*1000);
+  } else if(currentScreen==='scr-draw'){
+    // S4는 별도 짧은 복귀(기본 5초, 0=끔) — 뽑기 전 상태에만. 추첨 확정(drawing) 후에는 미적용
+    const s = cfg.drawIdleSec==null ? 5 : Math.max(0, parseInt(cfg.drawIdleSec)||0);
+    if(s>0) idleTimer=setTimeout(()=>{ if(currentScreen==='scr-draw' && !drawing) resetToIdle(); }, s*1000);
   }
 }
-function resetIdle(){ if(idleScreens.includes(currentScreen)) manageIdle(); }
+function resetIdle(){ if(idleScreens.includes(currentScreen) || currentScreen==='scr-draw') manageIdle(); }
 document.getElementById('kiosk').addEventListener('pointerdown', resetIdle, true);
 
 /* ════════════════ S1 대기 ════════════════ */
@@ -665,14 +671,19 @@ document.getElementById('scr-idle').addEventListener('click', e=>{
   if(e.target.id==='admin-tap') return;     // 관리자 진입 영역
   if(totalRemainAll()===0){ refreshIdleSoldout(); return; }
   startBgm('select');
-  if(cfg.ips.filter(ip=>remainOf(ip)>0).length===1 && cfg.ips.length===1){ curIp=cfg.ips[0]; renderLineup(); go('scr-lineup'); }
+  if(cfg.ips.filter(ip=>remainOf(ip)>0).length===1 && cfg.ips.length===1){ enterGame(cfg.ips[0]); }
   else goIp();
 });
+/* IP 확정 후 진입 분기: S3 표시(기본) → 라인업, 숨김 → 뽑기 화면 직행 */
+function lineupOn(){ return cfg.showLineup!==false; }
+function enterGame(ip){ curIp=ip; if(lineupOn()){ renderLineup(); go('scr-lineup'); } else { startDraw(); } }
 
 /* ════════════════ S2 IP 선택 ════════════════ */
 function goIp(){ renderIp(); go('scr-ip'); }
 /* S3 뒤로가기: IP가 1개면 S2를 건너뛰었으므로 대기화면(S1)으로, 여러 개면 다시 렌더한 S2로 */
 function lineupBack(){ if(cfg.ips.length<=1){ resetToIdle(); } else { renderIp(); go('scr-ip'); } }
+/* S4 뒤로가기: S3 표시 중이면 라인업으로, 숨김이면 S3를 건너뛰었으므로 S2(IP 1개면 S1)로 */
+function drawBack(){ if(lineupOn()){ renderLineup(); go('scr-lineup'); } else if(cfg.ips.length>1){ renderIp(); go('scr-ip'); } else { resetToIdle(); } }
 async function renderIp(){
   // 상단 히어로 배경: 전용 배너 우선, 없으면 첫 IP 배너, 그것도 없으면 기본. 타이틀은 고정 마크업.
   const heroKey = cfg.heroBannerKey || (cfg.ips[0]&&cfg.ips[0].heroImageKey);
@@ -690,7 +701,7 @@ async function renderIp(){
         <div class="stock">잔여 <b>${remain}</b> / ${total}</div>
         <div class="gauge"><i style="width:${total?remain/total*100:0}%"></i></div>
       </div>`;
-    if(!sold) card.onclick=()=>{ curIp=ip; renderLineup(); go('scr-lineup'); };
+    if(!sold) card.onclick=()=>{ enterGame(ip); };
     list.appendChild(card);
   });
 }
@@ -764,6 +775,7 @@ async function renderDrawBox(){
 function pickDraw(){
   if(drawing) return;
   drawing=true;
+  clearTimeout(idleTimer); // S4 뽑기 전 복귀 타이머 해제 — 추첨 확정 후 복귀 금지
   const btn=document.getElementById('draw-go-btn'); if(btn) btn.disabled=true;
   playSfx('pick');
   // 비복원 추첨 (랜덤·100% 당첨) — 번들은 하위까지 평탄화하여 재고 비례로 추첨
@@ -1145,6 +1157,9 @@ function renderAdmSettings(){
     <div class="adm-row"><label>이벤트명</label><input id="set-name" value="${escAttr(cfg.eventName)}"></div>
     <div class="adm-row"><label>PIN</label><input id="set-pin" value="${escAttr(cfg.adminPin)}"></div>
     <div class="adm-row"><label>유휴(초)</label><input id="set-idle" type="number" min="10" value="${cfg.idleTimeoutSec}"></div>
+    <div class="adm-row"><label>라인업(S3)</label><button class="adm-btn ${lineupOn()?'sec':'dng'}" onclick="toggleLineup()">${lineupOn()?'👁 표시 중':'🙈 숨김 중 (뽑기 직행)'}</button></div>
+    <div class="adm-row"><label>뽑기복귀(초)</label><input id="set-drawidle" type="number" min="0" value="${cfg.drawIdleSec==null?5:cfg.drawIdleSec}"></div>
+    <div class="muted-note">라인업 숨김 = 경품 리스트 화면(S3) 없이 S1(IP 여러 개면 IP선택) → <b>바로 뽑기 화면</b> · 뽑기복귀 = 뽑기 화면에서 무입력 N초 후 대기화면 복귀(<b>뽑기 버튼 누르기 전에만</b>, 0=끔) · 토글은 즉시 반영</div>
     <div class="adm-row"><label>쿨다운(분)</label><input id="set-cool" type="number" min="0" value="${cfg.cooldownMin==null?15:cfg.cooldownMin}"></div>
     <div class="muted-note">쿨다운 <b>기본값</b>: 상위(A·B·C·스페셜) 등급 당첨 후 <b>같은 등급</b>이 N분간 안 뽑히게 함 · <b>0 = 사용 안 함</b> · 상품 탭에서 <b>등급별로 따로</b> 지정 가능(빈칸=이 기본값) · 남은 재고가 전부 쿨다운 중이면 무시하고 지급(100% 당첨 유지)</div>
     <div class="adm-row"><label>음소거</label><button class="adm-btn ${cfg.muted?'dng':'sec'}" onclick="toggleMute()">${cfg.muted?'🔇 음소거 ON':'🔊 소리 ON'}</button></div>
@@ -1185,7 +1200,9 @@ function renderAdmSettings(){
   </div>
   <div class="muted-note" style="text-align:center;margin:14px 0 4px">앱 버전 <b>${APP_VER}</b></div>`;
 }
-function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); const cv=parseInt(document.getElementById('set-cool').value); cfg.cooldownMin=isNaN(cv)?15:Math.max(0,cv); saveCfg(); bootIdle(); toast('설정 저장됨'); }
+function saveSettings(){ cfg.eventName=document.getElementById('set-name').value||'컴투스 팝업 쿠지'; cfg.adminPin=document.getElementById('set-pin').value||'0000'; cfg.idleTimeoutSec=Math.max(10,parseInt(document.getElementById('set-idle').value)||30); const cv=parseInt(document.getElementById('set-cool').value); cfg.cooldownMin=isNaN(cv)?15:Math.max(0,cv); const dv=parseInt(document.getElementById('set-drawidle').value); cfg.drawIdleSec=isNaN(dv)?5:Math.max(0,dv); saveCfg(); bootIdle(); toast('설정 저장됨'); }
+/* S3 라인업 표시/숨김 — 즉시 저장·즉시 반영 (현장 전환용) */
+function toggleLineup(){ cfg.showLineup = !lineupOn(); saveCfg(); toast(lineupOn()?'라인업(S3) 표시 — 기존 플로우':'라인업(S3) 숨김 — 뽑기 직행'); renderAdmSettings(); }
 async function admPickHeroBanner(){ const key='hero_banner_'+Date.now(); const k=await uploadImg(key); if(k){ if(cfg.heroBannerKey){try{await idbDel(cfg.heroBannerKey);}catch(e){}} cfg.heroBannerKey=k; saveCfg(); toast('히어로 배너 등록됨'); renderAdmSettings(); } }
 async function delHeroBanner(){ if(cfg.heroBannerKey){ try{await idbDel(cfg.heroBannerKey);}catch(e){} cfg.heroBannerKey=null; saveCfg(); toast('삭제됨'); renderAdmSettings(); } }
 
