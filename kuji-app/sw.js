@@ -1,7 +1,7 @@
 /* 컴투스 팝업 쿠지 — Service Worker
    앱 자산을 사전 캐싱해 오프라인에서도 동작하게 한다.
    ※ 앱을 수정·재배포할 때는 CACHE 버전을 올려야 태블릿이 새 버전을 받는다. */
-const CACHE = 'kuji-v24';
+const CACHE = 'kuji-v25';
 const ASSETS = [
   './',
   './index.html',

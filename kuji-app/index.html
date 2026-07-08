@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v24';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v25';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -968,7 +968,8 @@ function renderAdmIps(){
   });
   const add=document.createElement('button'); add.className='adm-btn pri'; add.style.width='100%'; add.textContent='+ IP 추가 (최대 3개)';
   add.onclick=admAddIp; if(cfg.ips.length>=3) add.disabled=true; root.appendChild(add);
-  const save=document.createElement('button'); save.className='adm-btn pri'; save.style.cssText='width:100%;margin-top:10px;padding:14px'; save.textContent='💾 저장 (재고 초기화 확인)'; save.onclick=admSaveCfg; root.appendChild(save);
+  const save=document.createElement('button'); save.className='adm-btn pri'; save.style.cssText='width:100%;margin-top:10px;padding:14px'; save.textContent='💾 저장 (재고는 유지됨)'; save.onclick=admSaveCfg; root.appendChild(save);
+  const note=document.createElement('div'); note.className='muted-note'; note.style.marginTop='8px'; note.textContent='⚠️ 저장은 설정만 기록하며 재고(잔여 카운트)는 절대 건드리지 않습니다. 재고 전체 리셋은 [재고] 탭 하단 버튼(2단계 확인)으로만 가능합니다.'; root.appendChild(note);
 }
 function admEditIp(i,f,v){ cfg.ips[i][f]=v; }
 function admEditPrize(i,pi,f,v){
@@ -994,8 +995,21 @@ function admEditSubRemain(i,pi,si,v){
   stock[ip.id][pi][si]=n; saveStock(); toast('잔여 '+n+'개로 조정됨'); renderAdmIps();
 }
 function admEditLastOne(i,v){ if(!cfg.ips[i].lastOne) cfg.ips[i].lastOne={name:'',imageKey:null}; cfg.ips[i].lastOne.name=v; }
-function admAddPrize(i){ cfg.ips[i].prizes.push({grade:'',name:'',imageKey:null,count:1,tier:'normal'}); renderAdmIps(); }
-function admDelPrize(i,pi){ cfg.ips[i].prizes.splice(pi,1); renderAdmIps(); }
+/* 등급 추가/삭제 — prizes와 stock을 같은 인덱스로 함께 변경 + 즉시 저장 (길이 불일치로 인한 재고 전체 리셋 방지)
+   새 등급은 숨김 상태로 시작: 이름·수량 작성 전 참여자 화면(S3)·추첨에 노출되지 않게 */
+function admAddPrize(i){
+  const ip=cfg.ips[i], p={grade:'',name:'',imageKey:null,count:1,tier:'normal',hidden:true};
+  ip.prizes.push(p);
+  if(Array.isArray(stock[ip.id])) stock[ip.id].push(prizeFreshStock(p)); else stock[ip.id]=ip.prizes.map(prizeFreshStock);
+  saveCfg(); saveStock(); toast('새 등급 추가됨 (숨김 상태) — 작성 후 노출 버튼으로 공개'); renderAdmIps();
+}
+function admDelPrize(i,pi){
+  const ip=cfg.ips[i], p=ip.prizes[pi];
+  if(!confirm(`'${p.grade||p.name||'(이름없음)'}' 등급을 삭제할까요?\n이 등급의 재고 정보도 함께 삭제됩니다. (다른 등급 재고는 유지)`)) return;
+  ip.prizes.splice(pi,1);
+  if(Array.isArray(stock[ip.id])) stock[ip.id].splice(pi,1);
+  saveCfg(); saveStock(); toast('등급 삭제됨'); renderAdmIps();
+}
 /* 상품 노출/숨김 — 긴급 운영용, 즉시 저장·즉시 반영. 숨김 = S3 미표시·추첨 제외·잔여 집계 제외 (설정·재고·이미지 보존) */
 function admToggleHidden(i,pi){
   const p=cfg.ips[i].prizes[pi];
@@ -1007,18 +1021,33 @@ function admToggleHidden(i,pi){
 /* 상품 순서 이동(▲▼) — prizes와 stock을 같은 인덱스로 함께 swap, 즉시 저장 → S3에 그대로 반영 */
 function admMovePrize(i,pi,dir){ const ip=cfg.ips[i], pr=ip.prizes, j=pi+dir; if(j<0||j>=pr.length)return; [pr[pi],pr[j]]=[pr[j],pr[pi]]; const st=stock[ip.id]; if(Array.isArray(st)){ [st[pi],st[j]]=[st[j],st[pi]]; } saveCfg(); saveStock(); renderAdmIps(); toast('순서 변경됨'); }
 /* ── 번들 상품 편집 ── */
+/* 번들 전환/하위 편집 — 해당 상품의 stock 칸만 함께 갱신 + 즉시 저장 (다른 등급 재고에 영향 없음) */
 function admToggleBundle(i,pi){
-  const p=cfg.ips[i].prizes[pi];
-  if(isBundle(p)){ // 번들 해제 → 단순상품으로 (하위는 버림, 합계를 count로)
+  const ip=cfg.ips[i], p=ip.prizes[pi];
+  const remain=prizeRemain(ip,pi); // 전환 전 잔여 보존 시도
+  if(isBundle(p)){ // 번들 해제 → 단순상품으로 (하위는 버림, 합계를 count로, 잔여는 하위 잔여 합계 유지)
     if(!confirm('번들을 해제하면 하위상품 목록이 삭제됩니다. 계속할까요?')) return;
     p.count=prizeTotal(p); delete p.bundle; delete p.subs;
-  } else { // 번들 전환 → 첫 하위상품 1개로 시작(기존 이미지는 대표이미지로 유지)
+    if(Array.isArray(stock[ip.id])) stock[ip.id][pi]=remain;
+  } else { // 번들 전환 → 첫 하위상품 1개로 시작(기존 이미지는 대표이미지로 유지, 잔여는 하위 1칸으로 이어받음)
     p.bundle=true; p.subs=[{name:'',imageKey:null,count:Math.max(1,+p.count||1)}];
+    if(Array.isArray(stock[ip.id])) stock[ip.id][pi]=[remain];
   }
-  renderAdmIps();
+  saveCfg(); saveStock(); renderAdmIps();
 }
-function admAddSub(i,pi){ const p=cfg.ips[i].prizes[pi]; if(!Array.isArray(p.subs))p.subs=[]; p.subs.push({name:'',imageKey:null,count:1}); renderAdmIps(); }
-function admDelSub(i,pi,si){ const p=cfg.ips[i].prizes[pi]; p.subs.splice(si,1); if(!p.subs.length){ delete p.bundle; delete p.subs; p.count=p.count||1; } renderAdmIps(); }
+function admAddSub(i,pi){
+  const ip=cfg.ips[i], p=ip.prizes[pi]; if(!Array.isArray(p.subs))p.subs=[];
+  p.subs.push({name:'',imageKey:null,count:1});
+  const cell=(stock[ip.id]||[])[pi]; if(Array.isArray(cell)) cell.push(1);
+  saveCfg(); saveStock(); renderAdmIps();
+}
+function admDelSub(i,pi,si){
+  const ip=cfg.ips[i], p=cfg.ips[i].prizes[pi];
+  p.subs.splice(si,1);
+  const cell=(stock[ip.id]||[])[pi]; if(Array.isArray(cell)) cell.splice(si,1);
+  if(!p.subs.length){ delete p.bundle; delete p.subs; p.count=p.count||1; if(Array.isArray(stock[ip.id])) stock[ip.id][pi]=+p.count||1; }
+  saveCfg(); saveStock(); renderAdmIps();
+}
 function admEditSub(i,pi,si,f,v){ const s=cfg.ips[i].prizes[pi].subs[si]; s[f]= f==='count'? (Math.max(0,parseInt(v)||0)) : v; if(f==='count') renderAdmIps(); }
 async function admPickSubImg(i,pi,si){ const key='img_'+cfg.ips[i].id+'_p'+pi+'s'+si+'_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].prizes[pi].subs[si].imageKey=k; toast('하위 이미지 적용됨 (저장 잊지 마세요)'); renderAdmIps(); } }
 function admAddIp(){ if(cfg.ips.length>=3)return; cfg.ips.push({id:'ip'+Date.now(),name:'새 IP',heroImageKey:null,lastOne:{name:'',imageKey:null},prizes:[{grade:'A상',name:'',imageKey:null,count:1,tier:'high'}]}); renderAdmIps(); }
@@ -1031,14 +1060,18 @@ async function admPickImg(i,pi){ const key='img_'+cfg.ips[i].id+'_p'+pi+'_'+Date
 async function admPickHero(i){ const key='img_'+cfg.ips[i].id+'_hero_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].heroImageKey=k; renderAdmIps(); } }
 async function admPickLastOne(i){ if(!cfg.ips[i].lastOne)cfg.ips[i].lastOne={name:'',imageKey:null}; const key='img_'+cfg.ips[i].id+'_lo_'+Date.now(); const k=await uploadImg(key); if(k){ cfg.ips[i].lastOne.imageKey=k; renderAdmIps(); } }
 async function admDelLastOne(i){ if(!confirm('이 IP의 행운상을 삭제할까요?')) return; const lo=cfg.ips[i].lastOne; if(lo&&lo.imageKey){ try{await idbDel(lo.imageKey);}catch(e){} } cfg.ips[i].lastOne={name:'',imageKey:null}; saveCfg(); toast('행운상 삭제됨'); renderAdmIps(); }
+/* 설정 저장 — 재고는 절대 건드리지 않는다 (2026-07-08 현장 사고: 저장 confirm의 리셋 유도로 실재고 카운트 소실).
+   재고 전체 리셋은 재고 탭의 2단계 확인 버튼(admResetStock)으로만 가능. */
 function admSaveCfg(){
-  // 빈 등급 정리 (번들은 하위가 있으면 유지)
-  cfg.ips.forEach(ip=>{ ip.prizes=ip.prizes.filter(p=>p.grade||p.name||isBundle(p)); });
-  saveCfg();
-  if(confirm('설정을 저장했습니다.\n수량이 바뀌었다면 재고를 초기화해야 정확합니다.\n지금 재고를 초기화할까요? (당첨 로그는 유지)')){
-    stock=freshStock(); saveStock();
-  } else { reconcileStock(); }
-  toast('저장 완료'); renderAdmIps();
+  // 빈 등급 정리 (번들은 하위가 있으면 유지) — stock을 같은 인덱스로 함께 정리해 재고 보존
+  cfg.ips.forEach(ip=>{
+    const st=Array.isArray(stock[ip.id])?stock[ip.id]:null, keep=[], stKeep=[];
+    ip.prizes.forEach((p,i)=>{ if(p.grade||p.name||isBundle(p)){ keep.push(p); if(st) stKeep.push(st[i]!==undefined?st[i]:prizeFreshStock(p)); } });
+    ip.prizes=keep; if(st) stock[ip.id]=stKeep;
+  });
+  saveCfg(); reconcileStock(); saveStock();
+  toast('설정 저장됨 — 재고(잔여)는 그대로 유지');
+  renderAdmIps();
 }
 
 /* 재고 현황 */
