@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v26';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v27';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -599,6 +599,7 @@ function mediaBlob(v){ if(!v) return null; if(v instanceof Blob) return v; if(v.
 function idbDel(key){ return new Promise((res)=>{ if(!idb||!key)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
 /* 백업용: 전체 항목 열거 / 스토어 비우기 */
 function idbAll(){ return new Promise((res)=>{ try{ if(!idb)return res([]); const tx=idb.transaction('media','readonly'); const st=tx.objectStore('media'); const out=[]; const rq=st.openCursor(); rq.onsuccess=()=>{ const c=rq.result; if(c){ out.push({key:c.key,value:c.value}); c.continue(); } else res(out); }; rq.onerror=()=>res(out); }catch(e){ res([]); } }); }
+function idbKeys(){ return new Promise((res)=>{ try{ if(!idb)return res([]); const tx=idb.transaction('media','readonly'); const rq=tx.objectStore('media').getAllKeys(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); }catch(e){ res([]); } }); }
 function idbClear(){ return new Promise((res)=>{ try{ if(!idb)return res(false); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').clear(); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }catch(e){ res(false); } }); }
 
 /* 이미지 캐시(dataURL) — 부팅 시 config가 참조하는 모든 키 로드 */
@@ -1112,18 +1113,27 @@ function exportCsv(){
 }
 function admClearLog(){ if(confirm('당첨 로그를 모두 삭제할까요? (CSV 백업 권장)')){ logArr=[]; saveLog(); toast('로그 삭제됨'); renderAdmLog(); } }
 
-/* ════════════════ 설정 백업/복원 (.kuji) ════════════════ */
-const KUJI_MAGIC='KUJI', KUJI_VER=1;
+/* ════════════════ 설정 백업/복원 (.kuji) ════════════════
+   v2(2026-07-09): 아이패드에서 영상 포함 전체 백업이 메모리 초과로 크래시(흰 화면)하던 문제 대응 —
+   범위 선택(전체/영상 제외) + 순차 로딩(피크 완화). 영상 제외 백업은 가져올 때 대상 기기의 영상을 유지. */
+const KUJI_MAGIC='KUJI', KUJI_VER=2;
+/* 이 기기 설정 기준 영상 키 집합 (대기영상 + 영상 NPC + 레거시) */
+function videoKeySet(c){ const s=new Set(['idle_video']); ((c&&c.idleVideos)||[]).forEach(x=>s.add('idlevid_'+x.id)); ((c&&c.npcs)||[]).forEach(n=>{ if(n.type==='video') s.add('npc_'+n.id); }); return s; }
 function summarizeMedia(arr){ const c={img:0,audio:0,other:0}; (arr||[]).forEach(m=>{ if(m.kind==='image')c.img++; else if(/^(bgm_|sfx_)/.test(m.key))c.audio++; else c.other++; }); return c; }
 function dlBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },1500); }
 function backupName(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `kuji-backup-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.kuji`; }
-async function exportBackup(){
+async function exportBackup(scope){
+  if(!scope){ showExportScopeSheet(); return; } // 1단계: 범위 선택 (전체 / 영상 제외)
+  closeExportSheet();
   try{
     toast('백업 파일 생성 중…');
     const enc=new TextEncoder();
-    const items=await idbAll();
+    const excl = scope==='novideo' ? videoKeySet(cfg) : null;
+    // 순차 로딩: 키 목록만 먼저 얻고 한 건씩 읽는다 (idbAll 일괄 로딩의 메모리 피크 → 크래시 방지)
+    const keys=(await idbKeys()).filter(k=>!excl || !excl.has(String(k)));
     const media=[], parts=[]; let off=0;
-    for(const {key,value} of items){
+    for(const key of keys){
+      const value=await idbGet(key);
       let bytes=null, kind, type='';
       if(typeof value==='string'){ kind='image'; bytes=enc.encode(value); }
       else if(value && value.buf){ kind='buf'; type=value.type||''; bytes=new Uint8Array(value.buf); }
@@ -1133,7 +1143,7 @@ async function exportBackup(){
       media.push({ key:String(key), kind, type, off, len:bytes.length });
       parts.push(bytes); off+=bytes.length;
     }
-    const manifest={ v:KUJI_VER, app:'kuji', exportedAt:new Date().toISOString(),
+    const manifest={ v: scope==='novideo'?2:1, app:'kuji', scope, exportedAt:new Date().toISOString(),
       ls:{ cfg:localStorage.getItem(K_CFG), stock:localStorage.getItem(K_STOCK), log:localStorage.getItem(K_LOG) }, media };
     const mBytes=enc.encode(JSON.stringify(manifest));
     const header=new Uint8Array(8); header.set(enc.encode(KUJI_MAGIC),0);
@@ -1143,9 +1153,23 @@ async function exportBackup(){
     const c=summarizeMedia(media);
     /* iOS 공유시트는 "사용자 터치 직후"에만 열 수 있다 — 생성(수 초)+alert 뒤에 호출하면 조용히 거부됨.
        → 준비 완료 시트를 띄우고, 그 안의 버튼을 새로 터치하는 제스처로 share를 호출(2단계 터치) */
-    _exportPack={blob, name, mb, c};
+    _exportPack={blob, name, mb, c, scope};
     showExportSheet();
   }catch(e){ toast('백업 실패: '+((e&&e.message)||e)); }
+}
+function showExportScopeSheet(){
+  closeExportSheet();
+  const el=document.createElement('div'); el.id='export-sheet';
+  el.style.cssText='position:fixed;inset:0;background:rgba(8,2,28,.78);z-index:99;display:flex;align-items:center;justify-content:center;padding:24px';
+  el.innerHTML=`<div style="background:#1F1147;border:1px solid #3A2A6E;border-radius:14px;max-width:440px;width:100%;padding:20px;color:#fff">
+    <h4 style="margin:0 0 10px">내보내기 범위 선택</h4>
+    <button class="adm-btn pri" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportBackup('novideo')">🖼 영상 제외 (권장 · 가볍고 안정적)</button>
+    <div style="font-size:12px;color:#B3ACD6;line-height:1.6;margin:0 0 12px">설정·재고·로그·이미지·BGM·효과음 포함. 가져오는 기기의 <b>영상은 지우지 않고 유지</b>합니다.</div>
+    <button class="adm-btn sec" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportBackup('full')">🎬 전체 (영상 포함)</button>
+    <div style="font-size:12px;color:#B3ACD6;line-height:1.6;margin:0 0 12px">⚠️ 영상이 많으면 용량이 매우 커져 <b>기기 메모리 부족으로 실패(흰 화면)</b>할 수 있습니다.</div>
+    <button class="adm-btn dng" style="width:100%;padding:10px" onclick="closeExportSheet()">닫기</button>
+  </div>`;
+  document.body.appendChild(el);
 }
 let _exportPack=null;
 function showExportSheet(){
@@ -1156,7 +1180,7 @@ function showExportSheet(){
   const el=document.createElement('div'); el.id='export-sheet';
   el.style.cssText='position:fixed;inset:0;background:rgba(8,2,28,.78);z-index:99;display:flex;align-items:center;justify-content:center;padding:24px';
   el.innerHTML=`<div style="background:#1F1147;border:1px solid #3A2A6E;border-radius:14px;max-width:420px;width:100%;padding:20px;color:#fff">
-    <h4 style="margin:0 0 10px">📦 백업 파일 준비 완료</h4>
+    <h4 style="margin:0 0 10px">📦 백업 파일 준비 완료 ${_exportPack.scope==='novideo'?'<span style="font-size:12px;color:#B3ACD6">(영상 제외)</span>':'<span style="font-size:12px;color:#B3ACD6">(전체)</span>'}</h4>
     <div style="font-size:13px;color:#B3ACD6;line-height:1.7;margin-bottom:14px">📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other} · 용량 <b style="color:#FFD84D">${mb}MB</b>${c.audio===0?'<br>⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}</div>
     ${canShare?`<button class="adm-btn pri" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportShare()">📤 공유시트 열기 (에어드랍·파일에 저장·카톡)</button>`:''}
     <button class="adm-btn sec" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportDownload()">⬇️ 다운로드로 저장${canShare?' (예비)':''}</button>
@@ -1179,31 +1203,50 @@ async function exportShare(){ // 버튼 터치 = 새 사용자 제스처 → sha
 function exportDownload(){ if(!_exportPack) return; const {blob,name,mb}=_exportPack; dlBlob(blob,name); toast(`백업 다운로드 (${mb}MB)`); closeExportSheet(); }
 async function importBackup(){
   const f=await pickFile(); if(!f) return;
-  if(!confirm('백업을 가져오면 현재 기기의 설정·이미지·BGM·영상이 모두 덮어써집니다.\n계속할까요?')) return;
-  if(!confirm('정말 복원할까요? (현재 데이터는 사라집니다)')) return;
+  if(!confirm('백업을 가져오면 현재 기기의 설정·재고·로그·미디어가 백업 내용으로 덮어써집니다.\n(영상 제외 백업이면 이 기기의 영상은 유지됩니다)\n계속할까요?')) return;
+  if(!confirm('정말 복원할까요? (되돌릴 수 없음)')) return;
   try{
-    toast('복원 중… (영상이 크면 시간이 걸립니다)');
+    toast('복원 중… (파일이 크면 시간이 걸립니다)');
     const buf=await fileToArrayBuffer(f); if(!buf) throw new Error('파일을 읽을 수 없습니다');
-    const u8=new Uint8Array(buf), dec=new TextDecoder();
-    if(dec.decode(u8.subarray(0,4))!==KUJI_MAGIC) throw new Error('쿠지 백업 파일이 아닙니다');
-    const mLen=new DataView(buf,4,4).getUint32(0,true);
-    const manifest=JSON.parse(dec.decode(u8.subarray(8,8+mLen)));
-    if(manifest.app!=='kuji') throw new Error('형식이 올바르지 않습니다');
-    if((manifest.v|0)>KUJI_VER) throw new Error('더 최신 버전 백업입니다. 앱을 업데이트하세요');
-    const base=8+mLen, ls=manifest.ls||{};
-    if(ls.cfg!=null) localStorage.setItem(K_CFG, ls.cfg);
-    if(ls.stock!=null) localStorage.setItem(K_STOCK, ls.stock);
-    if(ls.log!=null) localStorage.setItem(K_LOG, ls.log);
-    await idbClear();
-    for(const m of (manifest.media||[])){
-      const slice=u8.subarray(base+m.off, base+m.off+m.len);
-      if(m.kind==='image') await idbPut(m.key, dec.decode(slice));
-      else await idbPut(m.key, { buf: slice.slice().buffer, type:m.type||'' });
-    }
-    const c=summarizeMedia(manifest.media||[]);
-    alert(`복원 완료\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}\n확인을 누르면 새로고침합니다.`);
+    const c=await applyBackup(buf);
+    alert(`복원 완료${c.scope==='novideo'?' (영상 제외 — 이 기기 영상 유지)':''}\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}\n확인을 누르면 새로고침합니다.`);
     location.reload();
   }catch(e){ toast('복원 실패: '+((e&&e.message)||e)); }
+}
+/* 백업 적용 코어 — scope==='novideo'면 이 기기의 영상(대기영상·영상NPC)과 cfg의 영상 목록을 보존 */
+async function applyBackup(buf){
+  const u8=new Uint8Array(buf), dec=new TextDecoder();
+  if(dec.decode(u8.subarray(0,4))!==KUJI_MAGIC) throw new Error('쿠지 백업 파일이 아닙니다');
+  const mLen=new DataView(buf,4,4).getUint32(0,true);
+  const manifest=JSON.parse(dec.decode(u8.subarray(8,8+mLen)));
+  if(manifest.app!=='kuji') throw new Error('형식이 올바르지 않습니다');
+  if((manifest.v|0)>KUJI_VER) throw new Error('더 최신 버전 백업입니다. 앱을 업데이트하세요');
+  const scope=manifest.scope||'full';
+  const base=8+mLen, ls=manifest.ls||{};
+  let oldCfg=null; try{ oldCfg=JSON.parse(localStorage.getItem(K_CFG)); }catch(e){}
+  if(ls.cfg!=null){
+    if(scope==='novideo' && oldCfg){
+      // 영상 목록은 이 기기 것을 유지 (백업 cfg의 영상 참조는 이 기기에 파일이 없음)
+      const nc=JSON.parse(ls.cfg);
+      nc.idleVideos = oldCfg.idleVideos||[];
+      nc.npcs = [ ...((nc.npcs||[]).filter(n=>n.type!=='video')), ...((oldCfg.npcs||[]).filter(n=>n.type==='video')) ];
+      localStorage.setItem(K_CFG, JSON.stringify(nc));
+    } else localStorage.setItem(K_CFG, ls.cfg);
+  }
+  if(ls.stock!=null) localStorage.setItem(K_STOCK, ls.stock);
+  if(ls.log!=null) localStorage.setItem(K_LOG, ls.log);
+  if(scope==='novideo'){
+    const keep=videoKeySet(oldCfg||{});
+    const keys=await idbKeys();
+    for(const k of keys){ if(!keep.has(String(k))) await idbDel(k); }
+  } else { await idbClear(); }
+  for(const m of (manifest.media||[])){
+    const slice=u8.subarray(base+m.off, base+m.off+m.len);
+    if(m.kind==='image') await idbPut(m.key, dec.decode(slice));
+    else await idbPut(m.key, { buf: slice.slice().buffer, type:m.type||'' });
+  }
+  const c=summarizeMedia(manifest.media||[]); c.scope=scope;
+  return c;
 }
 
 /* 설정 */
