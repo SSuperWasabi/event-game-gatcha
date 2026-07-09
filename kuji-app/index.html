@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v27';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v28';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -599,7 +599,13 @@ function mediaBlob(v){ if(!v) return null; if(v instanceof Blob) return v; if(v.
 function idbDel(key){ return new Promise((res)=>{ if(!idb||!key)return res(); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res(); }); }
 /* 백업용: 전체 항목 열거 / 스토어 비우기 */
 function idbAll(){ return new Promise((res)=>{ try{ if(!idb)return res([]); const tx=idb.transaction('media','readonly'); const st=tx.objectStore('media'); const out=[]; const rq=st.openCursor(); rq.onsuccess=()=>{ const c=rq.result; if(c){ out.push({key:c.key,value:c.value}); c.continue(); } else res(out); }; rq.onerror=()=>res(out); }catch(e){ res([]); } }); }
-function idbKeys(){ return new Promise((res)=>{ try{ if(!idb)return res([]); const tx=idb.transaction('media','readonly'); const rq=tx.objectStore('media').getAllKeys(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); }catch(e){ res([]); } }); }
+/* 키 전용 커서 — iPad WebKit에서 getAllKeys()가 빈 배열을 돌려주는 결함 회피 (커서는 idbAll로 실기 검증됨) */
+function idbKeys(){ return new Promise((res)=>{ try{ if(!idb)return res([]);
+  const st=idb.transaction('media','readonly').objectStore('media'); const out=[];
+  const rq=(typeof st.openKeyCursor==='function') ? st.openKeyCursor() : st.openCursor();
+  rq.onsuccess=()=>{ const c=rq.result; if(c){ out.push(c.key); c.continue(); } else res(out); };
+  rq.onerror=()=>res(out);
+}catch(e){ res([]); } }); }
 function idbClear(){ return new Promise((res)=>{ try{ if(!idb)return res(false); const tx=idb.transaction('media','readwrite'); tx.objectStore('media').clear(); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }catch(e){ res(false); } }); }
 
 /* 이미지 캐시(dataURL) — 부팅 시 config가 참조하는 모든 키 로드 */
@@ -1130,7 +1136,8 @@ async function exportBackup(scope){
     const enc=new TextEncoder();
     const excl = scope==='novideo' ? videoKeySet(cfg) : null;
     // 순차 로딩: 키 목록만 먼저 얻고 한 건씩 읽는다 (idbAll 일괄 로딩의 메모리 피크 → 크래시 방지)
-    const keys=(await idbKeys()).filter(k=>!excl || !excl.has(String(k)));
+    const allKeys=await idbKeys();
+    const keys=allKeys.filter(k=>!excl || !excl.has(String(k)));
     const media=[], parts=[]; let off=0;
     for(const key of keys){
       const value=await idbGet(key);
@@ -1153,7 +1160,7 @@ async function exportBackup(scope){
     const c=summarizeMedia(media);
     /* iOS 공유시트는 "사용자 터치 직후"에만 열 수 있다 — 생성(수 초)+alert 뒤에 호출하면 조용히 거부됨.
        → 준비 완료 시트를 띄우고, 그 안의 버튼을 새로 터치하는 제스처로 share를 호출(2단계 터치) */
-    _exportPack={blob, name, mb, c, scope};
+    _exportPack={blob, name, mb, c, scope, diag:{total:allKeys.length, picked:keys.length, packed:media.length}};
     showExportSheet();
   }catch(e){ toast('백업 실패: '+((e&&e.message)||e)); }
 }
@@ -1181,7 +1188,8 @@ function showExportSheet(){
   el.style.cssText='position:fixed;inset:0;background:rgba(8,2,28,.78);z-index:99;display:flex;align-items:center;justify-content:center;padding:24px';
   el.innerHTML=`<div style="background:#1F1147;border:1px solid #3A2A6E;border-radius:14px;max-width:420px;width:100%;padding:20px;color:#fff">
     <h4 style="margin:0 0 10px">📦 백업 파일 준비 완료 ${_exportPack.scope==='novideo'?'<span style="font-size:12px;color:#B3ACD6">(영상 제외)</span>':'<span style="font-size:12px;color:#B3ACD6">(전체)</span>'}</h4>
-    <div style="font-size:13px;color:#B3ACD6;line-height:1.7;margin-bottom:14px">📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other} · 용량 <b style="color:#FFD84D">${mb}MB</b>${c.audio===0?'<br>⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}</div>
+    <div style="font-size:13px;color:#B3ACD6;line-height:1.7;margin-bottom:14px">📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other} · 용량 <b style="color:#FFD84D">${mb}MB</b>${c.audio===0?'<br>⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}
+    <br><span style="font-size:11px;opacity:.7">진단: 저장소 키 ${_exportPack.diag.total}개 → 대상 ${_exportPack.diag.picked}개 → 수집 ${_exportPack.diag.packed}개${_exportPack.diag.total>0&&_exportPack.diag.packed===0?' ⚠️ 수집 실패 — 이 화면을 캡처해 전달해주세요':''}</span></div>
     ${canShare?`<button class="adm-btn pri" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportShare()">📤 공유시트 열기 (에어드랍·파일에 저장·카톡)</button>`:''}
     <button class="adm-btn sec" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportDownload()">⬇️ 다운로드로 저장${canShare?' (예비)':''}</button>
     <button class="adm-btn dng" style="width:100%;padding:10px" onclick="closeExportSheet()">닫기</button>
