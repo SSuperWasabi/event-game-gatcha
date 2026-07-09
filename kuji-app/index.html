@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v25';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v26';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -1141,17 +1141,42 @@ async function exportBackup(){
     const blob=new Blob([header, mBytes, ...parts], {type:'application/octet-stream'});
     const name=backupName(), mb=(blob.size/1048576).toFixed(1);
     const c=summarizeMedia(media);
-    alert(`내보낼 백업 내용\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}\n용량 ${mb}MB${c.audio===0?'\n\n⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}`);
-    try{
-      const file=new File([blob], name, {type:'application/octet-stream'});
-      if(navigator.canShare && navigator.canShare({files:[file]})){
-        await navigator.share({ files:[file], title:'쿠지 설정 백업' });
-        toast(`백업 공유 완료 (${mb}MB)`); return;
-      }
-    }catch(e){ if(e && e.name==='AbortError'){ toast('백업 취소됨'); return; } /* 공유 실패 → 다운로드 폴백 */ }
-    dlBlob(blob, name); toast(`백업 다운로드 (${mb}MB)`);
+    /* iOS 공유시트는 "사용자 터치 직후"에만 열 수 있다 — 생성(수 초)+alert 뒤에 호출하면 조용히 거부됨.
+       → 준비 완료 시트를 띄우고, 그 안의 버튼을 새로 터치하는 제스처로 share를 호출(2단계 터치) */
+    _exportPack={blob, name, mb, c};
+    showExportSheet();
   }catch(e){ toast('백업 실패: '+((e&&e.message)||e)); }
 }
+let _exportPack=null;
+function showExportSheet(){
+  closeExportSheet();
+  const {mb,c}=_exportPack;
+  let canShare=false;
+  try{ canShare=!!(navigator.canShare && navigator.canShare({files:[new File([_exportPack.blob], _exportPack.name, {type:'application/octet-stream'})]})); }catch(e){}
+  const el=document.createElement('div'); el.id='export-sheet';
+  el.style.cssText='position:fixed;inset:0;background:rgba(8,2,28,.78);z-index:99;display:flex;align-items:center;justify-content:center;padding:24px';
+  el.innerHTML=`<div style="background:#1F1147;border:1px solid #3A2A6E;border-radius:14px;max-width:420px;width:100%;padding:20px;color:#fff">
+    <h4 style="margin:0 0 10px">📦 백업 파일 준비 완료</h4>
+    <div style="font-size:13px;color:#B3ACD6;line-height:1.7;margin-bottom:14px">📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other} · 용량 <b style="color:#FFD84D">${mb}MB</b>${c.audio===0?'<br>⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}</div>
+    ${canShare?`<button class="adm-btn pri" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportShare()">📤 공유시트 열기 (에어드랍·파일에 저장·카톡)</button>`:''}
+    <button class="adm-btn sec" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportDownload()">⬇️ 다운로드로 저장${canShare?' (예비)':''}</button>
+    <button class="adm-btn dng" style="width:100%;padding:10px" onclick="closeExportSheet()">닫기</button>
+  </div>`;
+  document.body.appendChild(el);
+}
+function closeExportSheet(){ const el=document.getElementById('export-sheet'); if(el){ el.remove(); _exportPack=null; } }
+async function exportShare(){ // 버튼 터치 = 새 사용자 제스처 → share 확실히 동작
+  if(!_exportPack) return;
+  const {blob,name,mb}=_exportPack;
+  try{
+    await navigator.share({ files:[new File([blob], name, {type:'application/octet-stream'})], title:'쿠지 설정 백업' });
+    toast(`백업 공유 완료 (${mb}MB)`); closeExportSheet();
+  }catch(e){
+    if(e && e.name==='AbortError'){ toast('공유 취소됨 — 다시 시도할 수 있습니다'); return; } // 시트 유지
+    toast('공유 실패 — 아래 다운로드로 저장하세요');
+  }
+}
+function exportDownload(){ if(!_exportPack) return; const {blob,name,mb}=_exportPack; dlBlob(blob,name); toast(`백업 다운로드 (${mb}MB)`); closeExportSheet(); }
 async function importBackup(){
   const f=await pickFile(); if(!f) return;
   if(!confirm('백업을 가져오면 현재 기기의 설정·이미지·BGM·영상이 모두 덮어써집니다.\n계속할까요?')) return;
