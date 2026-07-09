@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v29';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v30';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -1128,18 +1128,43 @@ function videoKeySet(c){ const s=new Set(['idle_video']); ((c&&c.idleVideos)||[]
 function summarizeMedia(arr){ const c={img:0,audio:0,other:0}; (arr||[]).forEach(m=>{ if(m.kind==='image')c.img++; else if(/^(bgm_|sfx_)/.test(m.key))c.audio++; else c.other++; }); return c; }
 function dlBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },1500); }
 function backupName(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `kuji-backup-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.kuji`; }
+/* 분할 백업(v30): 총 미디어가 크면(이번 사례 423MB) 한 덩어리 Blob 조립이 iOS 메모리 한도에 걸려
+   빈 파일(0바이트)이 됨 → 60MB 이하 조각 파일(.kuji 1ofN…)로 나눠 내보내고, 가져올 때 순서대로 합친다. */
+const KUJI_CHUNK=60*1048576;
+let _exportJob=null;
 async function exportBackup(scope){
   if(!scope){ showExportScopeSheet(); return; } // 1단계: 범위 선택 (전체 / 영상 제외)
   closeExportSheet();
   try{
-    toast('백업 파일 생성 중…');
-    const enc=new TextEncoder();
+    toast('백업 계획 수립 중…');
     const excl = scope==='novideo' ? videoKeySet(cfg) : null;
-    // 순차 로딩: 키 목록만 먼저 얻고 한 건씩 읽는다 (idbAll 일괄 로딩의 메모리 피크 → 크래시 방지)
     const allKeys=await idbKeys();
     const keys=allKeys.filter(k=>!excl || !excl.has(String(k)));
-    const media=[], parts=[]; let off=0;
+    // 1차 스캔: 항목별 크기만 측정(값은 즉시 해제) → 60MB 이하 조각으로 분할 계획
+    const plan=[]; let cur=[], curBytes=0;
     for(const key of keys){
+      const value=await idbGet(key);
+      let n=0;
+      if(typeof value==='string') n=value.length;
+      else if(value && value.buf) n=value.buf.byteLength||0;
+      else if(value instanceof Blob) n=value.size;
+      else if(value instanceof ArrayBuffer) n=value.byteLength;
+      else continue;
+      if(curBytes>0 && curBytes+n>KUJI_CHUNK){ plan.push(cur); cur=[]; curBytes=0; }
+      cur.push(key); curBytes+=n;
+    }
+    if(cur.length || !plan.length) plan.push(cur);
+    _exportJob={ scope, plan, idx:0, total:plan.length, stamp:backupName().replace('.kuji',''), diag:{totalKeys:allKeys.length, picked:keys.length} };
+    await buildExportPart();
+  }catch(e){ toast('백업 실패: '+((e&&e.message)||e)); }
+}
+async function buildExportPart(){
+  const job=_exportJob; if(!job) return;
+  try{
+    toast(`백업 파일 ${job.idx+1}/${job.total} 생성 중…`);
+    const enc=new TextEncoder();
+    const media=[], parts=[]; let off=0;
+    for(const key of job.plan[job.idx]){
       const value=await idbGet(key);
       let bytes=null, kind, type='';
       if(typeof value==='string'){ kind='image'; bytes=enc.encode(value); }
@@ -1150,28 +1175,31 @@ async function exportBackup(scope){
       media.push({ key:String(key), kind, type, off, len:bytes.length });
       parts.push(bytes); off+=bytes.length;
     }
-    const manifest={ v: scope==='novideo'?2:1, app:'kuji', scope, exportedAt:new Date().toISOString(),
-      ls:{ cfg:localStorage.getItem(K_CFG), stock:localStorage.getItem(K_STOCK), log:localStorage.getItem(K_LOG) }, media };
+    // 설정·재고·로그는 1번 파일에만 담는다
+    const manifest={ v:2, app:'kuji', scope:job.scope, part:job.idx+1, parts:job.total, exportedAt:new Date().toISOString(),
+      ls: job.idx===0 ? { cfg:localStorage.getItem(K_CFG), stock:localStorage.getItem(K_STOCK), log:localStorage.getItem(K_LOG) } : undefined, media };
     const mBytes=enc.encode(JSON.stringify(manifest));
     const header=new Uint8Array(8); header.set(enc.encode(KUJI_MAGIC),0);
     new DataView(header.buffer).setUint32(4, mBytes.length, true);
-    const expected=8+mBytes.length+off; // 예상 파일 크기 (조립 검증용)
+    const expected=8+mBytes.length+off;
     let blob=new Blob([header, mBytes, ...parts], {type:'application/octet-stream'});
-    if(blob.size!==expected){
-      /* iPad WebKit: 다수 파트를 한 번에 Blob으로 합칠 때 내용이 유실되는 결함 → 소분 누적 재조립 */
+    if(blob.size!==expected){ // 그래도 유실되면 소분 누적 재조립
       let acc=new Blob([header, mBytes], {type:'application/octet-stream'});
       for(let i=0;i<parts.length;i+=8) acc=new Blob([acc, ...parts.slice(i,i+8)], {type:'application/octet-stream'});
       blob=acc;
     }
     const sizeOk=(blob.size===expected);
-    const name=backupName(), mb=(blob.size/1048576).toFixed(1);
+    const name = job.total>1 ? `${job.stamp}-${job.idx+1}of${job.total}.kuji` : `${job.stamp}.kuji`;
+    const mb=(blob.size/1048576).toFixed(1);
     const c=summarizeMedia(media);
-    /* iOS 공유시트는 "사용자 터치 직후"에만 열 수 있다 — 생성(수 초)+alert 뒤에 호출하면 조용히 거부됨.
-       → 준비 완료 시트를 띄우고, 그 안의 버튼을 새로 터치하는 제스처로 share를 호출(2단계 터치) */
-    _exportPack={blob, name, mb, c, scope, diag:{total:allKeys.length, picked:keys.length, packed:media.length, expected, actual:blob.size, sizeOk}};
+    /* iOS 공유시트는 "사용자 터치 직후"에만 열 수 있다 → 준비 완료 시트의 버튼 터치(새 제스처)로 share 호출 */
+    _exportPack={blob, name, mb, c, scope:job.scope, part:job.idx+1, parts:job.total,
+      diag:{total:job.diag.totalKeys, picked:job.diag.picked, packed:media.length, expected, actual:blob.size, sizeOk}};
     showExportSheet();
   }catch(e){ toast('백업 실패: '+((e&&e.message)||e)); }
 }
+function exportNextPart(){ if(!_exportJob) return; if(_exportJob.idx+1>=_exportJob.total){ cancelExport(); return; } _exportJob.idx++; const el=document.getElementById('export-sheet'); if(el) el.remove(); _exportPack=null; buildExportPart(); }
+function cancelExport(){ closeExportSheet(); _exportJob=null; }
 function showExportScopeSheet(){
   closeExportSheet();
   const el=document.createElement('div'); el.id='export-sheet';
@@ -1188,35 +1216,44 @@ function showExportScopeSheet(){
 }
 let _exportPack=null;
 function showExportSheet(){
-  closeExportSheet();
-  const {mb,c}=_exportPack;
+  const old=document.getElementById('export-sheet'); if(old) old.remove();
+  const {mb,c,part,parts}=_exportPack;
   let canShare=false;
   try{ canShare=!!(navigator.canShare && navigator.canShare({files:[new File([_exportPack.blob], _exportPack.name, {type:'application/octet-stream'})]})); }catch(e){}
+  const multi=parts>1, last=part>=parts;
   const el=document.createElement('div'); el.id='export-sheet';
   el.style.cssText='position:fixed;inset:0;background:rgba(8,2,28,.78);z-index:99;display:flex;align-items:center;justify-content:center;padding:24px';
-  el.innerHTML=`<div style="background:#1F1147;border:1px solid #3A2A6E;border-radius:14px;max-width:420px;width:100%;padding:20px;color:#fff">
-    <h4 style="margin:0 0 10px">📦 백업 파일 준비 완료 ${_exportPack.scope==='novideo'?'<span style="font-size:12px;color:#B3ACD6">(영상 제외)</span>':'<span style="font-size:12px;color:#B3ACD6">(전체)</span>'}</h4>
-    <div style="font-size:13px;color:#B3ACD6;line-height:1.7;margin-bottom:14px">📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other} · 용량 <b style="color:#FFD84D">${mb}MB</b>${c.audio===0?'<br>⚠️ 오디오(BGM/효과음)가 0개입니다 — 이 기기에 저장된 오디오가 없어요.':''}
-    <br><span style="font-size:11px;opacity:.7">진단: 저장소 키 ${_exportPack.diag.total}개 → 대상 ${_exportPack.diag.picked}개 → 수집 ${_exportPack.diag.packed}개 · 예상 ${(_exportPack.diag.expected/1048576).toFixed(2)}MB → 파일 ${(_exportPack.diag.actual/1048576).toFixed(2)}MB${_exportPack.diag.sizeOk?' ✓':' ⚠️ 조립 이상 — 이 화면을 캡처해 전달해주세요'}${_exportPack.diag.total>0&&_exportPack.diag.packed===0?' ⚠️ 수집 실패':''}</span></div>
+  el.innerHTML=`<div style="background:#1F1147;border:1px solid #3A2A6E;border-radius:14px;max-width:440px;width:100%;padding:20px;color:#fff">
+    <h4 style="margin:0 0 10px">📦 백업 파일 ${multi?`<b style="color:#FFD84D">${part} / ${parts}</b> `:''}준비 완료 <span style="font-size:12px;color:#B3ACD6">(${_exportPack.scope==='novideo'?'영상 제외':'전체'})</span></h4>
+    ${multi?`<div style="font-size:12px;color:#FFD84D;line-height:1.6;margin-bottom:8px">용량이 커서 ${parts}개 파일로 나눴습니다. <b>각 파일을 전송 → [다음 파일]</b>을 반복해 전부 전달하세요. 가져올 땐 1번 파일부터 순서대로.</div>`:''}
+    <div style="font-size:13px;color:#B3ACD6;line-height:1.7;margin-bottom:14px">이 파일: 📷 ${c.img} · 🔊 ${c.audio} · 🎬 ${c.other} · 용량 <b style="color:#FFD84D">${mb}MB</b>
+    <br><span style="font-size:11px;opacity:.7">진단: 키 ${_exportPack.diag.total} → 대상 ${_exportPack.diag.picked} → 이 파일 ${_exportPack.diag.packed}개 · 예상 ${(_exportPack.diag.expected/1048576).toFixed(2)}MB → 파일 ${(_exportPack.diag.actual/1048576).toFixed(2)}MB${_exportPack.diag.sizeOk?' ✓':' ⚠️ 조립 이상 — 이 화면을 캡처해 전달해주세요'}</span></div>
     ${canShare?`<button class="adm-btn pri" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportShare()">📤 공유시트 열기 (에어드랍·파일에 저장·카톡)</button>`:''}
     <button class="adm-btn sec" style="width:100%;padding:14px;margin-bottom:8px" onclick="exportDownload()">⬇️ 다운로드로 저장${canShare?' (예비)':''}</button>
-    <button class="adm-btn dng" style="width:100%;padding:10px" onclick="closeExportSheet()">닫기</button>
+    ${multi&&!last?`<button class="adm-btn sec" style="width:100%;padding:14px;margin-bottom:8px;border:1px solid #FFD84D;color:#FFD84D" onclick="exportNextPart()">▶ 다음 파일 (${part+1}/${parts}) 준비</button>`:''}
+    <button class="adm-btn dng" style="width:100%;padding:10px" onclick="cancelExport()">닫기</button>
   </div>`;
   document.body.appendChild(el);
 }
-function closeExportSheet(){ const el=document.getElementById('export-sheet'); if(el){ el.remove(); _exportPack=null; } }
+function closeExportSheet(){ const el=document.getElementById('export-sheet'); if(el) el.remove(); _exportPack=null; }
 async function exportShare(){ // 버튼 터치 = 새 사용자 제스처 → share 확실히 동작
   if(!_exportPack) return;
-  const {blob,name,mb}=_exportPack;
+  const {blob,name,mb,part,parts}=_exportPack;
   try{
-    await navigator.share({ files:[new File([blob], name, {type:'application/octet-stream'})], title:'쿠지 설정 백업' });
-    toast(`백업 공유 완료 (${mb}MB)`); closeExportSheet();
+    await navigator.share({ files:[new File([blob], name, {type:'application/octet-stream'})], title:'쿠지 설정 백업'+(parts>1?` ${part}/${parts}`:'') });
+    toast(`${parts>1?`파일 ${part}/${parts} `:''}공유 완료 (${mb}MB)`);
+    if(parts>1 && part<parts) exportNextPart(); else cancelExport();
   }catch(e){
     if(e && e.name==='AbortError'){ toast('공유 취소됨 — 다시 시도할 수 있습니다'); return; } // 시트 유지
     toast('공유 실패 — 아래 다운로드로 저장하세요');
   }
 }
-function exportDownload(){ if(!_exportPack) return; const {blob,name,mb}=_exportPack; dlBlob(blob,name); toast(`백업 다운로드 (${mb}MB)`); closeExportSheet(); }
+function exportDownload(){
+  if(!_exportPack) return;
+  const {blob,name,mb,part,parts}=_exportPack;
+  dlBlob(blob,name); toast(`${parts>1?`파일 ${part}/${parts} `:''}다운로드 (${mb}MB)`);
+  if(parts>1 && part<parts) exportNextPart(); else cancelExport();
+}
 async function importBackup(){
   const f=await pickFile(); if(!f) return;
   if(!confirm('백업을 가져오면 현재 기기의 설정·재고·로그·미디어가 백업 내용으로 덮어써집니다.\n(영상 제외 백업이면 이 기기의 영상은 유지됩니다)\n계속할까요?')) return;
@@ -1225,7 +1262,7 @@ async function importBackup(){
     toast('복원 중… (파일이 크면 시간이 걸립니다)');
     const buf=await fileToArrayBuffer(f); if(!buf) throw new Error('파일을 읽을 수 없습니다');
     const c=await applyBackup(buf);
-    alert(`복원 완료${c.scope==='novideo'?' (영상 제외 — 이 기기 영상 유지)':''}\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}\n확인을 누르면 새로고침합니다.`);
+    alert(`복원 완료${c.parts>1?` (파일 ${c.part}/${c.parts})`:''}${c.scope==='novideo'?' · 영상 제외 — 이 기기 영상 유지':''}\n📷 이미지 ${c.img} · 🔊 오디오 ${c.audio} · 🎬 영상/기타 ${c.other}${c.parts>1&&c.part<c.parts?`\n\n▶ 새로고침 후 ${c.part+1}번 파일도 이어서 가져오세요!`:''}\n확인을 누르면 새로고침합니다.`);
     location.reload();
   }catch(e){ toast('복원 실패: '+((e&&e.message)||e)); }
 }
@@ -1251,17 +1288,20 @@ async function applyBackup(buf){
   }
   if(ls.stock!=null) localStorage.setItem(K_STOCK, ls.stock);
   if(ls.log!=null) localStorage.setItem(K_LOG, ls.log);
-  if(scope==='novideo'){
-    const keep=videoKeySet(oldCfg||{});
-    const keys=await idbKeys();
-    for(const k of keys){ if(!keep.has(String(k))) await idbDel(k); }
-  } else { await idbClear(); }
+  // 분할 백업: 1번 파일에서만 기존 데이터 정리, 2번째부터는 덧쓰기만 (순서대로 가져오기 전제)
+  if((manifest.part||1)===1){
+    if(scope==='novideo'){
+      const keep=videoKeySet(oldCfg||{});
+      const keys=await idbKeys();
+      for(const k of keys){ if(!keep.has(String(k))) await idbDel(k); }
+    } else { await idbClear(); }
+  }
   for(const m of (manifest.media||[])){
     const slice=u8.subarray(base+m.off, base+m.off+m.len);
     if(m.kind==='image') await idbPut(m.key, dec.decode(slice));
     else await idbPut(m.key, { buf: slice.slice().buffer, type:m.type||'' });
   }
-  const c=summarizeMedia(manifest.media||[]); c.scope=scope;
+  const c=summarizeMedia(manifest.media||[]); c.scope=scope; c.part=manifest.part||1; c.parts=manifest.parts||1;
   return c;
 }
 
