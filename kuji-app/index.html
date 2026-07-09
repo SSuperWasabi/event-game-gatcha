@@ -508,7 +508,7 @@
 <script>
 /* ════════════════ 저장소 키 ════════════════ */
 const K_CFG='kuji.config.v1', K_STOCK='kuji.stock.v1', K_LOG='kuji.log.v1', K_COOL='kuji.cooldown.v1';
-const APP_VER='v30';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
+const APP_VER='v31';  /* 캐시 갱신 확인용 — sw.js CACHE와 함께 올림 */
 
 /* ════════════════ 기본 설정 (관리자 미설정 시) ════════════════ */
 function defaultConfig(){
@@ -1129,8 +1129,10 @@ function summarizeMedia(arr){ const c={img:0,audio:0,other:0}; (arr||[]).forEach
 function dlBlob(blob,name){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{a.remove();}catch(e){} URL.revokeObjectURL(url); },1500); }
 function backupName(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return `kuji-backup-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.kuji`; }
 /* 분할 백업(v30): 총 미디어가 크면(이번 사례 423MB) 한 덩어리 Blob 조립이 iOS 메모리 한도에 걸려
-   빈 파일(0바이트)이 됨 → 60MB 이하 조각 파일(.kuji 1ofN…)로 나눠 내보내고, 가져올 때 순서대로 합친다. */
-const KUJI_CHUNK=60*1048576;
+   빈 파일(0바이트)이 됨 → 60MB 이하 조각 파일(.kuji 1ofN…)로 나눠 내보내고, 가져올 때 순서대로 합친다.
+   v31: 분할은 iOS에서만 — PC(데스크탑)는 메모리 여유가 커서 단일 파일로 내보냄 (PC 마스터 → 드라이브/USB → 아이패드 가져오기 운영) */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+let KUJI_CHUNK_CAP = IS_IOS ? 60*1048576 : Infinity;
 let _exportJob=null;
 async function exportBackup(scope){
   if(!scope){ showExportScopeSheet(); return; } // 1단계: 범위 선택 (전체 / 영상 제외)
@@ -1150,7 +1152,7 @@ async function exportBackup(scope){
       else if(value instanceof Blob) n=value.size;
       else if(value instanceof ArrayBuffer) n=value.byteLength;
       else continue;
-      if(curBytes>0 && curBytes+n>KUJI_CHUNK){ plan.push(cur); cur=[]; curBytes=0; }
+      if(curBytes>0 && curBytes+n>KUJI_CHUNK_CAP){ plan.push(cur); cur=[]; curBytes=0; }
       cur.push(key); curBytes+=n;
     }
     if(cur.length || !plan.length) plan.push(cur);
